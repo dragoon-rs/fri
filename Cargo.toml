@@ -1,0 +1,9 @@
+[package]
+name = "fri"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ark-ff = "0.4.2"
+ark-poly = "0.4.2"
+rs_merkle = "1.4.2"
