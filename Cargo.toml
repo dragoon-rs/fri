@@ -3,7 +3,24 @@ name = "fri"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+
 [dependencies]
 ark-ff = "0.4.2"
 ark-poly = "0.4.2"
+ark-serialize = "0.4.2"
 rs_merkle = "1.4.2"
+blake3 = { version = "1.5.1", optional = true }
+sha3 = { version = "0.10.8", optional = true }
+
+[dev-dependencies]
+winter-fri = "0.9"
+winter-utils = "0.9"
+winter-rand-utils = "0.9"
+winter-math = "0.9"
+
+[features]
+sha3 = ["dep:sha3"]
+sha3_asm = ["sha3", "sha3/asm"]
+blake3 = ["dep:blake3"]
+default = ["sha3", "blake3"]
