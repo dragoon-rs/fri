@@ -2,7 +2,7 @@ use rs_merkle::Hasher;
 
 /// Blake3-256 implementation of the [`rs_merkle::Hasher`] trait.
 ///
-/// See documentation of crate [`sha3`].
+/// See documentation of crate [`blake3`].
 #[derive(Clone, Copy, Debug)]
 pub struct Blake3;
 

@@ -3,7 +3,7 @@ use winter_math::{fields::f128::BaseElement, FieldElement, StarkField};
 use winter_rand_utils::{rand_value, rand_vector};
 use winter_utils::transpose_slice;
 
-use crate::to_evaluations;
+use crate::{to_evaluations, FoldedEvaluations};
 
 const NUMBER_OF_POLYNOMIALS: usize = 10;
 const POLY_COEFFS_LEN: usize = 2048;
@@ -51,7 +51,8 @@ fn test_reduction() {
 
                 let transposed = transpose_slice::<_, FACTOR>(&evaluations);
                 evaluations = winter_fri::folding::apply_drp(&transposed, BaseElement::ONE, alpha);
-                evaluations2 = super::reduce_polynomial::<FACTOR, _>(&evaluations2, alpha2, None);
+                let folded = FoldedEvaluations::new(&evaluations2);
+                evaluations2 = super::reduce_polynomial::<FACTOR, _>(&folded, alpha2, None);
 
                 assert_eq!(convert_many(&evaluations), evaluations2);
             }
