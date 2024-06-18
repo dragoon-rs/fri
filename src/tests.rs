@@ -1,23 +1,16 @@
-use ark_ff::{Fp128, MontBackend, MontConfig};
+use fri_test_utils::{Fq, BLOWUP_FACTOR, DOMAIN_SIZE, NUMBER_OF_POLYNOMIALS, NUM_QUERIES, POLY_COEFFS_LEN};
+use rand::{thread_rng, Rng};
 use winter_math::{fields::f128::BaseElement, FieldElement, StarkField};
 use winter_rand_utils::{rand_value, rand_vector};
 use winter_utils::transpose_slice;
 
-use crate::{to_evaluations, FoldedEvaluations};
-
-const NUMBER_OF_POLYNOMIALS: usize = 10;
-const POLY_COEFFS_LEN: usize = 2048;
-const BLOWUP_FACTOR: usize = 4;
-
-const DOMAIN_SIZE: usize = (POLY_COEFFS_LEN * BLOWUP_FACTOR).next_power_of_two();
-
-/// Matches `BaseElement` from winterfell
-#[derive(MontConfig)]
-#[modulus = "340282366920938463463374557953744961537"]
-#[generator = "3"]
-pub struct Test;
-/// A prime, fft-friendly field isomorph to [`winter_math::fields::f128::BaseElement`].
-pub type Fq = Fp128<MontBackend<Test, 2>>;
+use crate::{
+    algorithms::Blake3,
+    build_proof, commit_polynomial,
+    folding::FoldedEvaluations,
+    rng::FriChallenger,
+    utils::to_evaluations,
+};
 
 macro_rules! do_for_multiple_folding_factors {
     ($factor: ident = $($factors: literal),* => $action: block) => {
@@ -36,7 +29,7 @@ fn test_reduction() {
     for i in 0..NUMBER_OF_POLYNOMIALS {
         println!("Testing on polynomial {i}");
 
-        let poly = rand_vector(DOMAIN_SIZE);
+        let poly = rand_vector(POLY_COEFFS_LEN);
         let poly2 = convert_many(&poly);
 
         do_for_multiple_folding_factors!(FACTOR = 2, 4, 8, 16 => {
@@ -60,7 +53,33 @@ fn test_reduction() {
     }
 }
 
-#[inline]
+#[test]
+fn test_prove_verify() {
+    let mut rng = thread_rng();
+    let poly: Vec<Fq> = (0..POLY_COEFFS_LEN).map(|_| rng.gen()).collect();
+
+    do_for_multiple_folding_factors!(FACTOR = 2, 4, 8, 16 => {
+        println!("--Folding factor={FACTOR}");
+
+        let mut rng = FriChallenger::<Blake3>::default();
+        let commitments = commit_polynomial::<FACTOR, _, Blake3, _>(poly.clone(), &mut rng, BLOWUP_FACTOR, FACTOR);
+        let proof = build_proof(commitments, &mut rng, NUM_QUERIES);
+
+        rng.reset();
+        proof.verify::<FACTOR, _>(&mut rng, NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE).unwrap();
+
+        assert!(proof.verify::<{FACTOR*2}, _>(&mut rng, NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE).is_err());
+        assert!(proof.verify::<{FACTOR/2}, _>(&mut rng, NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE).is_err());
+
+        assert!(proof.verify::<FACTOR, _>(&mut rng, NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE * 2).is_err());
+        assert!(proof.verify::<FACTOR, _>(&mut rng, NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE / 2).is_err());
+
+        assert!(proof.verify::<FACTOR, _>(&mut rng, NUM_QUERIES, POLY_COEFFS_LEN * 2, DOMAIN_SIZE).is_err());
+        assert!(proof.verify::<FACTOR, _>(&mut rng, NUM_QUERIES, POLY_COEFFS_LEN / 2, DOMAIN_SIZE).is_err());
+
+    });
+}
+
 fn prepare_winterfell_poly<F: StarkField>(mut poly: Vec<F>) -> Vec<F> {
     use winter_math::fft::{evaluate_poly, get_twiddles};
     poly.resize(DOMAIN_SIZE, F::ZERO);
@@ -69,12 +88,10 @@ fn prepare_winterfell_poly<F: StarkField>(mut poly: Vec<F>) -> Vec<F> {
     poly
 }
 
-#[inline]
-pub fn convert(value: &BaseElement) -> Fq {
+fn convert(value: &BaseElement) -> Fq {
     Fq::from(value.as_int())
 }
 
-#[inline]
-pub fn convert_many(values: &[BaseElement]) -> Vec<Fq> {
+fn convert_many(values: &[BaseElement]) -> Vec<Fq> {
     values.iter().map(convert).collect()
 }

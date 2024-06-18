@@ -6,21 +6,29 @@ edition = "2021"
 [lib]
 
 [dependencies]
-ark-ff = "0.4.2"
-ark-poly = "0.4.2"
-ark-serialize = "0.4.2"
-rs_merkle = "1.4.2"
-blake3 = { version = "1.5.1", optional = true }
-sha3 = { version = "0.10.8", optional = true }
+ark-ff = { version = "0.4.2", default-features = false }
+ark-poly = { version = "0.4.2", default-features = false }
+ark-serialize = { version = "0.4.2", default-features = false }
+rs_merkle = { version = "1.4.2", default-features = false }
+blake3 = { version = "1.5.1", default-features = false, optional = true }
+sha3 = { version = "0.10.8", default-features = false, optional = true }
 
 [dev-dependencies]
 winter-fri = "0.9"
 winter-utils = "0.9"
 winter-rand-utils = "0.9"
 winter-math = "0.9"
+rand = "0.8.5"
+criterion = "0.5.1"
+fri_test_utils = { path = "test_utils" }
 
 [features]
 sha3 = ["dep:sha3"]
 sha3_asm = ["sha3", "sha3/asm"]
 blake3 = ["dep:blake3"]
 default = ["sha3", "blake3"]
+
+[[bench]]
+name = "fri"
+harness = false
+required-features = ["blake3"]

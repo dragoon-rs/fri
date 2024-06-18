@@ -2,8 +2,9 @@ use ark_ff::FftField;
 use ark_serialize::CanonicalSerialize;
 use rs_merkle::{Hasher, MerkleTree};
 
-use crate::{FoldedEvaluations, MerkleTreeExt};
+use crate::{utils::MerkleTreeExt, folding::FoldedEvaluations};
 
+#[derive(Clone)]
 pub(crate) struct FriLayer<const N: usize, F, H: Hasher> {
     tree: MerkleTree<H>,
     evaluations: FoldedEvaluations<N, F>,
@@ -26,14 +27,14 @@ impl<const N: usize, F, H: Hasher> FriLayer<N, F, H> {
     }
 }
 
-#[must_use]
+/// Result of a polynomial folding. Use [`fri::build_proof`] to get a FRI proof.
+#[derive(Clone)]
 pub struct FriCommitments<const N: usize, F, H: Hasher> {
     layers: Vec<FriLayer<N, F, H>>,
     remainder: Vec<F>,
 }
 
 impl<const N: usize, F: FftField, H: Hasher> FriCommitments<N, F, H> {
-    #[inline]
     pub(crate) fn new(degree_bound: usize) -> Self {
         let layers = Vec::with_capacity(degree_bound.ilog2().div_ceil(N.ilog2()) as usize);
         Self {
@@ -47,8 +48,8 @@ impl<const N: usize, F: FftField, H: Hasher> FriCommitments<N, F, H> {
     pub(crate) fn remainder(self) -> Vec<F> {
         self.remainder
     }
-    #[inline]
-    pub(crate) fn commit_layer(&mut self, layer: FriLayer<N, F, H>) {
+    pub(crate) fn commit_layer(&mut self, layer: FriLayer<N, F, H>)
+    {
         self.layers.push(layer);
     }
     pub(crate) fn set_remainder(&mut self, polynomial: Vec<F>) {
