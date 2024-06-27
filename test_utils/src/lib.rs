@@ -3,7 +3,7 @@
 use ark_ff::{Fp128, MontBackend, MontConfig};
 
 pub const NUMBER_OF_POLYNOMIALS: usize = 10;
-pub const POLY_COEFFS_LEN: usize = 2048;
+pub const POLY_COEFFS_LEN: usize = 4096;
 pub const BLOWUP_FACTOR: usize = 4;
 pub const NUM_QUERIES: usize = 32;
 

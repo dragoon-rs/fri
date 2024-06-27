@@ -4,15 +4,15 @@ use ark_ff::FftField;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
 };
-use folding::{fold_positions, reduce_polynomial, FoldedEvaluationsSlice};
-use prover::{FriCommitments, FriLayer};
+pub use commit::FriCommitments;
+use folding::{fold_positions, FoldedEvaluationsSlice};
 use rng::ReseedableRng;
 use rs_merkle::{Hasher, MerkleProof};
-use utils::{to_evaluations, to_polynomial, AssertPowerOfTwo, HasherExt};
+use utils::{to_evaluations, AssertPowerOfTwo, HasherExt};
 
 pub mod algorithms;
+pub mod commit;
 pub mod folding;
-pub mod prover;
 pub mod rng;
 pub mod utils;
 
@@ -88,54 +88,38 @@ impl<F: Copy, H: Hasher> FriProofLayer<F, H> {
 /// Commits the polynomial according to FRI algorithm.
 ///
 /// - `N` is the folding factor. It should be a power of two.
-/// - `polynomial` is the list of coefficients of the polynomial.
+/// - `polynomial` is the list of coefficients of the polynomial. See [`FriCommitments::new`] for an alternative
+///   function that accepts the evaluations directly.
 /// - `rng` is the pseudo-random number generator to be used by the algorithm.
 /// - The initial evaluation domain will have size at least `polynomial.len() * blowup_factor` (rounded up to
 ///   the next power of two).
-/// - `remainder_degree` is the degree of the remainder polynomial in the last FRI layer.
+/// - `remainder_degree_plus_one` is one more than degree of the remainder polynomial in the last FRI layer.
 ///   It should be a power of `N`.
 ///
 /// # Panics
-/// This panics if `polynomial.len() * blowup_factor > 2^63` and if `F` does not contain a subgroup of the size
-/// of the requested evaluation domain.
+/// This may either panic or have unspecified behaviour if `polynomial.len() * blowup_factor > 2^63`,
+/// if `remainder_degree_plus_one` is inconsistent with `polynomial.len()` and `N`, or if `F` does not contain
+/// a subgroup of the size of the requested evaluation domain.
 pub fn commit_polynomial<const N: usize, F, H, R>(
     polynomial: Vec<F>,
-    mut rng: R,
+    rng: R,
     blowup_factor: usize,
-    remainder_degree: usize,
+    remainder_degree_plus_one: usize,
 ) -> FriCommitments<N, F, H>
 where
     F: FftField,
     H: Hasher,
     R: ReseedableRng<Seed = H::Hash>,
 {
-    let _: () = AssertPowerOfTwo::<N>::OK;
-
     // Convert the polynonial to evaluation form:
-    let num_coeffs = polynomial.len();
-    let mut prover = FriCommitments::new(num_coeffs);
     let domain_size = (polynomial.len() * blowup_factor)
         .checked_next_power_of_two()
         .unwrap_or_else(|| panic!(
             "Domain size out of bounds for blowup factor {blowup_factor} and polynomial of degree-bound {}", polynomial.len()
         ));
-    let mut evaluations = to_evaluations(polynomial, domain_size);
 
-    // Reduce the polynomial from its evaluations:
-    let domain = GeneralEvaluationDomain::<F>::new(N).unwrap();
-    while evaluations.len() > remainder_degree * blowup_factor {
-        let layer = FriLayer::new(&evaluations);
-        rng.reseed(layer.tree().root().expect("cannot get tree root"));
-        evaluations =
-            reduce_polynomial::<N, _>(layer.evaluations(), rng.draw_alpha(), Some(&domain));
-        prover.commit_layer(layer);
-    }
-
-    // Commit remainder directly
-    let poly = to_polynomial(evaluations, remainder_degree);
-    rng.reseed(H::hash_item(&poly));
-    prover.set_remainder(poly);
-    prover
+    let evaluations = to_evaluations(polynomial, domain_size);
+    FriCommitments::new(evaluations, rng, blowup_factor, remainder_degree_plus_one)
 }
 
 // TODO? create a function that combines `commit_polynomial` and `build_proof`?

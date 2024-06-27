@@ -7,7 +7,7 @@ use winter_utils::transpose_slice;
 use crate::{
     algorithms::Blake3,
     build_proof, commit_polynomial,
-    folding::FoldedEvaluations,
+    folding::{reduce_polynomial, FoldedEvaluations},
     rng::FriChallenger,
     utils::to_evaluations,
 };
@@ -45,7 +45,7 @@ fn test_reduction() {
                 let transposed = transpose_slice::<_, FACTOR>(&evaluations);
                 evaluations = winter_fri::folding::apply_drp(&transposed, BaseElement::ONE, alpha);
                 let folded = FoldedEvaluations::new(&evaluations2);
-                evaluations2 = super::reduce_polynomial::<FACTOR, _>(&folded, alpha2, None);
+                evaluations2 = reduce_polynomial::<FACTOR, _>(&folded, alpha2, None);
 
                 assert_eq!(convert_many(&evaluations), evaluations2);
             }
@@ -62,7 +62,7 @@ fn test_prove_verify() {
         println!("--Folding factor={FACTOR}");
 
         let mut rng = FriChallenger::<Blake3>::default();
-        let commitments = commit_polynomial::<FACTOR, _, Blake3, _>(poly.clone(), &mut rng, BLOWUP_FACTOR, FACTOR);
+        let commitments = commit_polynomial::<FACTOR, _, Blake3, _>(poly.clone(), &mut rng, BLOWUP_FACTOR, 1);
         let proof = build_proof(commitments, &mut rng, NUM_QUERIES);
 
         rng.reset();

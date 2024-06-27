@@ -71,14 +71,25 @@ impl<H: Hasher> MerkleTreeExt for MerkleTree<H> {
 /// `domain_size` must be a power of two and strictly greater than the degree of the polynomial.
 /// 
 /// # Example
-/// ```ignore
-/// let polynomial = /* vec of coeffs */;
-/// let evaluations = to_evaluations(polynomial, domain_size);
+/// ```
+/// use ark_ff::FftField;
+/// use ark_poly::{Polynomial, DenseUVPolynomial, univariate::DensePolynomial};
+/// use rand::{thread_rng, Rng};
+/// 
+/// use fri::utils::{to_evaluations, to_polynomial};
+/// use fri_test_utils::Fq;
+/// 
+/// const POLY_COEFFS_LEN: usize = 32;
+/// const DOMAIN_SIZE: usize = 128;
+/// 
+/// let mut rng = thread_rng();
+/// let polynomial: Vec<Fq> = (0..POLY_COEFFS_LEN).map(|_| rng.gen()).collect();
+/// let evaluations = to_evaluations(polynomial.clone(), DOMAIN_SIZE);
 /// let dense_poly = DensePolynomial::from_coefficients_vec(polynomial.clone());
 /// 
-/// let w = F::get_root_of_unity(domain_size).unwrap();
+/// let w = Fq::get_root_of_unity(DOMAIN_SIZE as u64).unwrap();
 /// 
-/// assert_eq!(evaluations[0], dense_poly.evaluate(&w));
+/// assert_eq!(evaluations[1], dense_poly.evaluate(&w));
 /// 
 /// let interpolated = to_polynomial(evaluations, polynomial.len());
 /// 
