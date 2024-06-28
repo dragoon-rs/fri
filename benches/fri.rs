@@ -10,7 +10,7 @@ fn bench_commit(c: &mut Criterion) {
             || (0..POLY_COEFFS_LEN).map(|_| rng.gen()).collect(),
             |poly| {
                 let rng = FriChallenger::<Blake3>::default();
-                let _c = commit_polynomial::<4, Fq, Blake3, _>(poly, rng, BLOWUP_FACTOR, 4);
+                let _c = commit_polynomial::<4, Fq, Blake3, _>(poly, rng, BLOWUP_FACTOR, 1);
             },
             BatchSize::SmallInput,
         )
@@ -25,7 +25,7 @@ fn bench_query(c: &mut Criterion) {
                 let poly = (0..POLY_COEFFS_LEN).map(|_| rng.gen()).collect();
                 let mut rng = FriChallenger::<Blake3>::default();
                 let commitments =
-                    commit_polynomial::<4, Fq, Blake3, _>(poly, &mut rng, BLOWUP_FACTOR, 4);
+                    commit_polynomial::<4, Fq, Blake3, _>(poly, &mut rng, BLOWUP_FACTOR, 1);
                 (rng, commitments)
             },
             |(rng, commitments)| {
@@ -49,7 +49,7 @@ fn bench_verify(c: &mut Criterion) {
             },
             |proof| {
                 let rng = FriChallenger::<Blake3>::default();
-                let _c = proof
+                let () = proof
                     .verify::<4, _>(rng, NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE)
                     .unwrap();
             },

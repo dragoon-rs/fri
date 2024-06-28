@@ -1,5 +1,3 @@
-//!
-
 use std::{
     borrow::{Borrow, Cow},
     ops::{Deref, Index},
@@ -167,30 +165,30 @@ impl<const N: usize, F> FoldedEvaluationsSlice<N, F> {
     /// This may either panic or have unspecified behaviour if `N` is not a power of two or
     /// `evaluations.len()` is not a multiple of `N`.
     #[inline]
-    pub fn from_flat_evaluations<'a>(evaluations: &'a [F]) -> &'a Self {
+    pub fn from_flat_evaluations(evaluations: &[F]) -> &Self {
         FoldedEvaluations::<N, _>::check_slice(evaluations);
         Self::from_flat_evaluations_unchecked(evaluations)
     }
     /// Same as [`Self::from_flat_evaluations`], but does not panic.
     #[inline]
-    pub fn from_flat_evaluations_unchecked<'a>(evaluations: &'a [F]) -> &'a Self {
+    pub const fn from_flat_evaluations_unchecked(evaluations: &[F]) -> &Self {
         // SAFETY: `Self` and `[F]` have the same layout.
         // See [https://rust-lang.github.io/unsafe-code-guidelines/layout/structs-and-tuples.html#single-field-structs]
         unsafe { &*(evaluations as *const [F] as *const Self) }
     }
     /// Yields the underlying slice. See [`FoldedEvaluations::into_flat_evaluations`].
     #[inline]
-    pub fn as_flat_evaluations(&self) -> &[F] {
+    pub const fn as_flat_evaluations(&self) -> &[F] {
         &self.0
     }
     /// Returns the size of the domain the evaluations were initially computed on.
     #[inline]
-    pub fn domain_size(&self) -> usize {
+    pub const fn domain_size(&self) -> usize {
         self.0.len()
     }
     /// Returns the size of the folded domain. This corresponds to the number of leaves in the Merkle tree.
     #[inline]
-    pub fn folded_len(&self) -> usize {
+    pub const fn folded_len(&self) -> usize {
         self.0.len() / N
     }
 }
@@ -212,7 +210,7 @@ impl<'a, const N: usize, F> IntoIterator for &'a FoldedEvaluationsSlice<N, F> {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.as_ref().into_iter()
+        self.as_ref().iter()
     }
 }
 

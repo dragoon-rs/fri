@@ -1,18 +1,23 @@
 use std::iter::zip;
 
-use ark_ff::FftField;
+use ark_ff::{FftField, Field};
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
 };
+
 pub use commit::FriCommitments;
+use derive_where::derive_where;
 use folding::{fold_positions, FoldedEvaluationsSlice};
+use fri_proc_macros::{CanonicalDeserializeAlt, CanonicalSerializeAlt};
 use rng::ReseedableRng;
-use rs_merkle::{Hasher, MerkleProof};
-use utils::{to_evaluations, AssertPowerOfTwo, HasherExt};
+use rs_merkle::Hasher;
+use utils::{to_evaluations, AssertPowerOfTwo, HasherExt, MerkleProof};
 
 pub mod algorithms;
 pub mod commit;
 pub mod folding;
+#[cfg(feature = "frida")]
+pub mod frida;
 pub mod rng;
 pub mod utils;
 
@@ -32,14 +37,25 @@ pub enum VerifyError {
     InvalidRemainder,
 }
 
-// TODO: serialization!
 /// A FRI proof.
+#[derive_where(Clone, PartialEq; F)]
+#[derive_where(Debug; F, H::Hash)]
+#[derive(CanonicalSerializeAlt, CanonicalDeserializeAlt)]
 pub struct FriProof<F, H: Hasher> {
     layers: Vec<FriProofLayer<F, H>>,
     remainder: Vec<F>,
 }
 
-struct FriProofLayer<F, H: Hasher> {
+impl<F: Field, H: Hasher> FriProof<F, H> {
+    pub(crate) fn first_layer(&self) -> &FriProofLayer<F, H> {
+        &self.layers[0]
+    }
+}
+
+#[derive_where(Clone, PartialEq; F)]
+#[derive_where(Debug; F, H::Hash)]
+#[derive(CanonicalSerializeAlt, CanonicalDeserializeAlt)]
+pub(crate) struct FriProofLayer<F, H: Hasher> {
     proof: MerkleProof<H>,
     /// TODO: store separately?
     commitment: H::Hash,
@@ -47,9 +63,9 @@ struct FriProofLayer<F, H: Hasher> {
     evaluations: Vec<F>,
 }
 
-impl<F: Copy, H: Hasher> FriProofLayer<F, H> {
+impl<F: Field, H: Hasher> FriProofLayer<F, H> {
     /// Returns `None` if the number of evaluations stored in this layer is inconsistent with folding factor `N`.
-    fn evaluations<const N: usize>(&self) -> Option<&FoldedEvaluationsSlice<N, F>> {
+    pub(crate) fn evaluations<const N: usize>(&self) -> Option<&FoldedEvaluationsSlice<N, F>> {
         (self.evaluations.len() % N == 0).then(|| {
             FoldedEvaluationsSlice::<N, _>::from_flat_evaluations_unchecked(&self.evaluations)
         })
@@ -63,7 +79,7 @@ impl<F: Copy, H: Hasher> FriProofLayer<F, H> {
     ///
     /// Returns `None` if the number of evaluations in this layer is inconsistent with folding factor `N` or
     /// if the evaluations are inconsistent with the requested positions.
-    fn queried_evaluations<const N: usize>(
+    pub(crate) fn queried_evaluations<const N: usize>(
         &self,
         positions: &[usize],
         folded_positions: &[usize],
@@ -122,7 +138,6 @@ where
     FriCommitments::new(evaluations, rng, blowup_factor, remainder_degree_plus_one)
 }
 
-// TODO? create a function that combines `commit_polynomial` and `build_proof`?
 /// Constructs a FRI proof by making queries to the `commitments`.
 ///
 /// - `rng` *must* be in the same state as it was when `commit_polynomial` has returned.
@@ -155,7 +170,7 @@ where
         // `layer.tree().proof(...)` requires sorted positions
         let mut positions_sorted = positions.clone();
         positions_sorted.sort_unstable();
-        let proof = layer.tree().proof(&positions_sorted);
+        let proof = layer.tree().proof(&positions_sorted).into();
 
         let mut evaluations = Vec::with_capacity(N * positions.len());
         for &pos in &positions {
@@ -175,6 +190,27 @@ where
 }
 
 impl<F: FftField, H: Hasher> FriProof<F, H> {
+    /// Combines [`FriCommitments::new`] and [`build_proof`] in only one convenience function.
+    #[inline]
+    pub fn prove<const N: usize, R>(
+        evaluations: Vec<F>,
+        mut rng: R,
+        blowup_factor: usize,
+        remainder_degree_plus_one: usize,
+        num_queries: usize,
+    ) -> Self
+    where
+        R: ReseedableRng<Seed = H::Hash>,
+    {
+        let commitments = FriCommitments::<N, _, _>::new(
+            evaluations,
+            &mut rng,
+            blowup_factor,
+            remainder_degree_plus_one,
+        );
+        build_proof(commitments, &mut rng, num_queries)
+    }
+
     /// Verify a FRI proof. This checks the proof was properly built from a polynomial with degree lower than
     /// `degree_bound`.
     ///
@@ -196,7 +232,7 @@ impl<F: FftField, H: Hasher> FriProof<F, H> {
         mut domain_size: usize,
     ) -> Result<(), VerifyError> {
         // Initial checks
-        let _ = AssertPowerOfTwo::<N>::OK;
+        let () = AssertPowerOfTwo::<N>::OK;
 
         if !domain_size.is_power_of_two() || domain_size <= degree_bound {
             return Err(VerifyError::BadDomainSize(domain_size));
@@ -228,7 +264,7 @@ impl<F: FftField, H: Hasher> FriProof<F, H> {
                 &fold_positions(&positions, domain_size / N),
                 domain_size,
             )
-            .ok_or_else(|| VerifyError::WrongNumberOfEvaluations { depth: 0 })?;
+            .ok_or(VerifyError::WrongNumberOfEvaluations { depth: 0 })?;
 
         // Check layers
         for (depth, layer) in self.layers.iter().enumerate() {
@@ -236,11 +272,11 @@ impl<F: FftField, H: Hasher> FriProof<F, H> {
 
             let layer_evaluations = layer
                 .evaluations::<N>()
-                .ok_or_else(|| VerifyError::WrongNumberOfEvaluations { depth })?;
+                .ok_or(VerifyError::WrongNumberOfEvaluations { depth })?;
 
             let queried_evaluations = layer
                 .queried_evaluations::<N>(&positions, &folded_positions, domain_size)
-                .ok_or_else(|| VerifyError::WrongNumberOfEvaluations { depth })?;
+                .ok_or(VerifyError::WrongNumberOfEvaluations { depth })?;
 
             if queried_evaluations != evaluations {
                 return Err(VerifyError::InvalidFolding { depth });
@@ -301,5 +337,53 @@ impl<F: FftField, H: Hasher> FriProof<F, H> {
         }
 
         Ok(())
+    }
+}
+
+/// Calls a FRI function with a folding factor that is not known at compile time.
+/// The following examples assume the folding factor is contained in variable `factor`. The identifier `FACTOR`
+/// can be changed to any valid identifier. By convention, it should be `SCREAMING_SNAKE_CASE`.
+///
+/// Valid forms:
+/// - `dynamic_folding_factor!(let FACTOR = factor => /* function to execute */)`
+/// - `dynamic_folding_factor!(16, 32, let FACTOR = factor => /* function to execute */)`
+///
+/// The first form only supports factors 2, 4, 8 and 16 and will panic if `factor` is not equal to one of them.
+/// The second form only supports factors specified before the `let` and can be used to support factors that
+/// the first form doesn't.
+///
+/// # Examples
+/// ```ignore
+/// let factor = /* value known at runtime */;
+/// let proof = dynamic_folding_factor!(let N = factor => <FriProof<_, H>>::prove::<N, _>(
+///     evaluations,
+///     rngs,
+///     blowup_factor,
+///     remainder_degree_plus_one,
+///     num_queries
+/// ));
+/// ```
+///
+/// All the supported factors should be power of two, otherwise the code may not compile.
+/// ```compile_fail
+/// // This does not compile because `3` is not a power of two:
+/// let factor = /* value known at runtime */;
+/// dynamic_folding_factor!(2, 3, 4, let N = factor => {
+///     commit_polynomial::<N, _, H, _>(poly, rng, blowup_factor, remainder_degree_plus_one);
+/// });
+/// ```
+#[macro_export]
+macro_rules! dynamic_folding_factor {
+    (let $n:ident = $factor: expr => $function: expr) => {
+        dynamic_folding_factor!(2, 5, 8, 16, let $n = $factor => $function)
+    };
+    ($($values: literal,)+ let $n:ident = $factor: expr => $function: expr) => {
+        match $factor {
+            $($values => {
+                const $n: usize = $values;
+                $function
+            })+
+            f => unimplemented!("Unexpected folding factor {f}")
+        }
     }
 }

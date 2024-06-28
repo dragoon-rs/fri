@@ -24,20 +24,20 @@ impl<const N: usize, F, H: Hasher> FriLayer<N, F, H> {
         let tree = MerkleTree::from_evaluations(evaluations.as_ref());
         Self { tree, evaluations }
     }
-    pub fn tree(&self) -> &MerkleTree<H> {
+    pub const fn tree(&self) -> &MerkleTree<H> {
         &self.tree
     }
-    pub fn evaluations(&self) -> &FoldedEvaluations<N, F> {
+    pub const fn evaluations(&self) -> &FoldedEvaluations<N, F> {
         &self.evaluations
     }
 }
 
 /// Result of a polynomial folding (FRI COMMIT phase).
 ///
-/// Use [`fri::commit_polynomial`] to create a [`FriCommitments`] from a polynomial in coefficient form,
+/// Use [`crate::commit_polynomial`] to create a [`FriCommitments`] from a polynomial in coefficient form,
 /// or [`FriCommitments::new`] to create it from the evaluations directly.
 ///
-/// Use [`fri::build_proof`] to get an actual FRI proof from a [`FriCommitments`].
+/// Use [`crate::build_proof`] to get an actual FRI proof from a [`FriCommitments`].
 #[derive(Clone)]
 pub struct FriCommitments<const N: usize, F, H: Hasher> {
     layers: Vec<FriLayer<N, F, H>>,
@@ -49,7 +49,7 @@ impl<const N: usize, F: FftField, H: Hasher> FriCommitments<N, F, H> {
     /// - `evaluations` is the list of evaluations of the polynomial on the `n`-th roots of unity
     ///    (where `n = evaluations.len()`).
     ///
-    /// See [`fri::commit_polynomial`] for information about the other parameters.
+    /// See [`crate::commit_polynomial`] for information about the other parameters.
     ///
     /// # Panics
     /// This may either panic or have unspecified behaviour if `remainder_degree_plus_one` is inconsistent with

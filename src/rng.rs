@@ -1,6 +1,8 @@
 use std::mem::size_of;
 
 use ark_ff::Field;
+use derive_more::AsRef;
+use derive_where::derive_where;
 use rs_merkle::Hasher;
 
 /// A seed-based pseudo-random number generator.
@@ -19,7 +21,7 @@ pub trait ReseedableRng {
         F: FnOnce(&[u8]) -> T;
 
     /// Draws a pseudo-random number from field `F`. This does not need to be overriden.
-    /// 
+    ///
     /// # Panics
     /// This panics if this object is not able to draw a random value from this field.
     fn draw_alpha<F: Field>(&mut self) -> F {
@@ -54,17 +56,19 @@ pub trait ReseedableRng {
 
 /// This struct is designed to be used as the pseudo-random number generator in the
 /// non-interactive version of FRI.
-/// 
+///
 /// # Example
-/// ```ignore 
+/// ```ignore
 /// use fri::{algorithms::Blake3, rng::{FriChallenger, ReseedableRng}};
-/// 
+///
 /// let mut challenger = FriChallenger::<Blake3>::default();
-/// 
+///
 /// // For each FRI layer:
 /// challenger.reseed(/* FRI commitment */);
 /// let alpha = challenger.draw_alpha();
 /// ```
+#[derive_where(Clone, PartialEq;)]
+#[derive_where(Debug; H::Hash)]
 pub struct FriChallenger<H: Hasher> {
     seed: H::Hash,
     counter: usize,
@@ -108,7 +112,7 @@ impl<H: Hasher> FriChallenger<H> {
     /// use fri::{algorithms::Blake3, rng::{FriChallenger, ReseedableRng}};
     ///
     /// let mut challenger1 = FriChallenger::<Blake3>::default();
-    /// 
+    ///
     /// challenger1.reseed(Blake3::hash(&[5]));
     /// let hash1 = challenger1.next_bytes(|bytes| bytes.to_vec());
     ///
@@ -117,13 +121,66 @@ impl<H: Hasher> FriChallenger<H> {
     ///
     /// let mut challenger2 = FriChallenger::<Blake3>::default();
     /// let hash3 = challenger2.next_bytes(|bytes| bytes.to_vec());
-    /// 
+    ///
     /// assert_ne!(hash1, hash2);
     /// assert_eq!(hash2, hash3);
     /// ```
     pub fn reset(&mut self) {
         self.seed = H::hash(&[]);
         self.counter = 0;
+    }
+}
+
+/// A wrapper for a [`ReseedableRng`] that memorizes the last drawn positions.
+/// 
+/// Use [`MemoryRng::default`] to wrap the default value of `R` and [`MemoryRng::from`] to wrap an already
+/// existing `R`.
+/// 
+/// Call [`MemoryRng::into_inner`] to forget the last drawn positions and return ownership of the underlying `R`.
+#[derive(AsRef, Default, Clone, PartialEq, Eq, Debug)]
+pub struct MemoryRng<R> {
+    #[as_ref]
+    inner: R,
+    last_positions: Vec<usize>,
+}
+
+impl<R> From<R> for MemoryRng<R> {
+    fn from(value: R) -> Self {
+        Self {
+            inner: value,
+            last_positions: vec![],
+        }
+    }
+}
+
+impl<R: ReseedableRng> ReseedableRng for MemoryRng<R> {
+    type Seed = R::Seed;
+
+    fn reseed(&mut self, seed: Self::Seed) {
+        self.inner.reseed(seed);
+    }
+    fn next_bytes<T, F>(&mut self, f: F) -> T
+    where
+        F: FnOnce(&[u8]) -> T,
+    {
+        self.inner.next_bytes(f)
+    }
+    fn draw_positions(&mut self, count: usize, domain_size: usize) -> Vec<usize> {
+        self.last_positions = self.inner.draw_positions(count, domain_size);
+        self.last_positions.clone()
+    }
+}
+
+impl<R> MemoryRng<R> {
+    /// Returns the last positions drawn with [`MemoryRng::draw_positions`].
+    /// If [`MemoryRng::draw_positions`] has not been called yet, this returns an empty slice.
+    /// 
+    /// This cannot return positions drawn by the underlying `R` before it was wrapped by this [`MemoryRng`].
+    pub fn last_positions(&self) -> &[usize] {
+        &self.last_positions
+    }
+    pub fn into_inner(self) -> R {
+        self.inner
     }
 }
 
