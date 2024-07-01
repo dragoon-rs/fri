@@ -22,6 +22,9 @@ mod pcs;
 #[cfg(feature = "frida_pcs")]
 pub use pcs::*;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(From, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum FridaError {
     InvalidFriProof(VerifyError),
@@ -33,7 +36,8 @@ pub enum FridaError {
 pub struct FridaBuilder<F, H: Hasher> {
     tree: MerkleTree<H>,
     fri_proof: FriProof<F, H>,
-    zipped_queries: Vec<Vec<F>>,
+    zipped_queries: Vec<F>,
+    num_poly: usize,
 }
 
 impl<F: FftField, H: Hasher> FridaBuilder<F, H> {
@@ -85,13 +89,14 @@ impl<F: FftField, H: Hasher> FridaBuilder<F, H> {
         let positions = rng.last_positions();
         let zipped_queries = positions
             .iter()
-            .map(|&pos| nth_evaluations(evaluations, pos).collect())
+            .flat_map(|&pos| nth_evaluations(evaluations, pos))
             .collect();
 
         Self {
             tree,
             fri_proof: proof,
             zipped_queries,
+            num_poly: evaluations.len(),
         }
     }
 
@@ -120,7 +125,8 @@ impl<F: FftField, H: Hasher> FridaBuilder<F, H> {
 #[derive(CanonicalDeserializeAlt, CanonicalSerializeAlt)]
 pub struct FridaCommitment<F, H: Hasher> {
     zipped_root: H::Hash,
-    zipped_queries: Vec<Vec<F>>,
+    zipped_queries: Vec<F>,
+    num_poly: usize,
     fri_proof: FriProof<F, H>,
 }
 
@@ -157,8 +163,20 @@ impl<F: FftField, H: Hasher> FridaCommitment<F, H> {
             .queried_evaluations::<N>(positions, &folded_postions, domain_size)
             .unwrap();
 
-        if queried != batch_polynomials(&self.zipped_queries, alpha) {
+        if queried.len() * self.num_poly != self.zipped_queries.len() {
             return Err(FridaError::InvalidZippedQueries);
+        }
+        for i in 0..queried.len() {
+            if queried[i]
+                != evaluate(
+                    self.zipped_queries[(i * self.num_poly)..((i + 1) * self.num_poly)]
+                        .iter()
+                        .copied(),
+                    alpha,
+                )
+            {
+                return Err(FridaError::InvalidZippedQueries);
+            }
         }
 
         Ok(())
@@ -172,21 +190,30 @@ impl<F: FftField, H: Hasher> From<FridaBuilder<F, H>> for FridaCommitment<F, H> 
             zipped_root,
             zipped_queries: value.zipped_queries,
             fri_proof: value.fri_proof,
+            num_poly: value.num_poly,
         }
     }
 }
 
 /// Returns the evaluations of the polynomial `P` which is the linear combination of the input polynomials `P_i`.
-/// 
+///
 /// `P = P_0 + alpha*P_1 + ... + alpha^(n-1)P_n-1)`
 pub fn batch_polynomials<F: Field>(evaluations: &[Vec<F>], alpha: F) -> Vec<F> {
     let mut combined_poly = Vec::with_capacity(evaluations[0].len());
     for i in 0..evaluations[0].len() {
-        combined_poly.push(
-            nth_evaluations(evaluations, i).rfold(F::ZERO, |result, eval| result * alpha + eval),
-        )
+        combined_poly.push(evaluate(nth_evaluations(evaluations, i), alpha))
     }
     combined_poly
+}
+
+#[inline]
+fn evaluate<F: Field, I: IntoIterator<Item = F>>(coeffs: I, alpha: F) -> F
+where
+    I::IntoIter: DoubleEndedIterator,
+{
+    coeffs
+        .into_iter()
+        .rfold(F::ZERO, |result, eval| result * alpha + eval)
 }
 
 /// Returns `(poly[n] for poly in evaluations)`

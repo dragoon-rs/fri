@@ -1,4 +1,8 @@
-use fri_test_utils::{Fq, BLOWUP_FACTOR, DOMAIN_SIZE, NUMBER_OF_POLYNOMIALS, NUM_QUERIES, POLY_COEFFS_LEN};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use fri_test_utils::{
+    do_for_multiple_folding_factors, Fq, BLOWUP_FACTOR, DOMAIN_SIZE, NUMBER_OF_POLYNOMIALS,
+    NUM_QUERIES, POLY_COEFFS_LEN,
+};
 use rand::{thread_rng, Rng};
 use winter_math::{fields::f128::BaseElement, FieldElement, StarkField};
 use winter_rand_utils::{rand_value, rand_vector};
@@ -10,18 +14,8 @@ use crate::{
     folding::{reduce_polynomial, FoldedEvaluations},
     rng::FriChallenger,
     utils::to_evaluations,
+    FriProof,
 };
-
-macro_rules! do_for_multiple_folding_factors {
-    ($factor: ident = $($factors: literal),* => $action: block) => {
-        {
-            $({
-                const $factor: usize = $factors;
-                $action;
-            })*
-        }
-    };
-}
 
 // This assumes winterfri is correct
 #[test]
@@ -66,17 +60,39 @@ fn test_prove_verify() {
         let proof = build_proof(commitments, &mut rng, NUM_QUERIES);
 
         rng.reset();
-        proof.verify::<FACTOR, _>(&mut rng, NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE).unwrap();
+        proof.verify::<FACTOR, _>(rng.clone(), NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE).unwrap();
 
-        assert!(proof.verify::<{FACTOR*2}, _>(&mut rng, NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE).is_err());
-        assert!(proof.verify::<{FACTOR/2}, _>(&mut rng, NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE).is_err());
+        assert!(proof.verify::<{FACTOR*2}, _>(rng.clone(), NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE).is_err());
+        assert!(proof.verify::<{FACTOR/2}, _>(rng.clone(), NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE).is_err());
 
-        assert!(proof.verify::<FACTOR, _>(&mut rng, NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE * 2).is_err());
-        assert!(proof.verify::<FACTOR, _>(&mut rng, NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE / 2).is_err());
+        assert!(proof.verify::<FACTOR, _>(rng.clone(), NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE * 2).is_err());
+        assert!(proof.verify::<FACTOR, _>(rng.clone(), NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE / 2).is_err());
 
-        assert!(proof.verify::<FACTOR, _>(&mut rng, NUM_QUERIES, POLY_COEFFS_LEN * 2, DOMAIN_SIZE).is_err());
-        assert!(proof.verify::<FACTOR, _>(&mut rng, NUM_QUERIES, POLY_COEFFS_LEN / 2, DOMAIN_SIZE).is_err());
+        assert!(proof.verify::<FACTOR, _>(rng.clone(), NUM_QUERIES, POLY_COEFFS_LEN / 2, DOMAIN_SIZE).is_err());
 
+    });
+}
+
+#[test]
+fn test_serialization() {
+    let mut rng = thread_rng();
+    let poly: Vec<Fq> = (0..POLY_COEFFS_LEN).map(|_| rng.gen()).collect();
+
+    do_for_multiple_folding_factors!(FACTOR = 2, 4, 8, 16 => {
+        println!("--Folding factor={FACTOR}");
+
+        let mut rng = FriChallenger::<Blake3>::default();
+        let commitments = commit_polynomial::<FACTOR, _, Blake3, _>(poly.clone(), &mut rng, BLOWUP_FACTOR, 1);
+        let proof = build_proof(commitments, &mut rng, NUM_QUERIES);
+
+        let mut proof_bytes = vec![];
+        proof.serialize_compressed(&mut proof_bytes).unwrap();
+
+        let proof2 = FriProof::deserialize_compressed(&proof_bytes[..]).unwrap();
+        assert_eq!(proof, proof2);
+
+        rng.reset();
+        proof2.verify::<FACTOR, _>(rng, NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE).unwrap();
     });
 }
 

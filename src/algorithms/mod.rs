@@ -4,9 +4,9 @@
 //! 
 //! These implementations are opt-in and only provided if the corresponding features are enabled.
 
-#[cfg(feature = "blake3")]
+#[cfg(any(test, feature = "blake3"))]
 pub mod blake3;
-#[cfg(feature = "blake3")]
+#[cfg(any(test, feature = "blake3"))]
 pub use blake3::Blake3;
 
 #[cfg(feature = "sha3")]
