@@ -132,10 +132,10 @@ impl<H: Hasher> FriChallenger<H> {
 }
 
 /// A wrapper for a [`ReseedableRng`] that memorizes the last drawn positions.
-/// 
+///
 /// Use [`MemoryRng::default`] to wrap the default value of `R` and [`MemoryRng::from`] to wrap an already
 /// existing `R`.
-/// 
+///
 /// Call [`MemoryRng::into_inner`] to forget the last drawn positions and return ownership of the underlying `R`.
 #[derive(AsRef, Default, Clone, PartialEq, Eq, Debug)]
 pub struct MemoryRng<R> {
@@ -174,7 +174,7 @@ impl<R: ReseedableRng> ReseedableRng for MemoryRng<R> {
 impl<R> MemoryRng<R> {
     /// Returns the last positions drawn with [`MemoryRng::draw_positions`].
     /// If [`MemoryRng::draw_positions`] has not been called yet, this returns an empty slice.
-    /// 
+    ///
     /// This cannot return positions drawn by the underlying `R` before it was wrapped by this [`MemoryRng`].
     pub fn last_positions(&self) -> &[usize] {
         &self.last_positions
@@ -198,5 +198,12 @@ where
         F: FnOnce(&[u8]) -> T,
     {
         (**self).next_bytes(f)
+    }
+
+    fn draw_alpha<F: Field>(&mut self) -> F {
+        (**self).draw_alpha()
+    }
+    fn draw_positions(&mut self, count: usize, domain_size: usize) -> Vec<usize> {
+        (**self).draw_positions(count, domain_size)
     }
 }
