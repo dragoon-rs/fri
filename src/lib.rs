@@ -320,7 +320,7 @@ impl<F: FftField, H: Hasher> FriProof<F, H> {
         }
 
         // Check remainder
-        if self.remainder.len() != degree_bound
+        if self.remainder.len() > degree_bound
             && self.remainder[degree_bound..]
                 .iter()
                 .any(|&coeff| coeff != F::ZERO)
