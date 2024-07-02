@@ -17,8 +17,10 @@ use crate::{
     FriCommitments, FriProof, VerifyError,
 };
 
+#[deprecated = "feature `frida_pcs` is not tested"]
 #[cfg(feature = "frida_pcs")]
 mod pcs;
+#[allow(deprecated)]
 #[cfg(feature = "frida_pcs")]
 pub use pcs::*;
 
@@ -218,7 +220,7 @@ where
 
 /// Returns `(poly[n] for poly in evaluations)`
 #[inline]
-fn nth_evaluations<F: Copy>(
+pub fn nth_evaluations<F: Copy>(
     evaluations: &[Vec<F>],
     n: usize,
 ) -> impl DoubleEndedIterator<Item = F> + '_ {

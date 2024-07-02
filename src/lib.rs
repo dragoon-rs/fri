@@ -375,7 +375,7 @@ impl<F: FftField, H: Hasher> FriProof<F, H> {
 #[macro_export]
 macro_rules! dynamic_folding_factor {
     (let $n:ident = $factor: expr => $function: expr) => {
-        dynamic_folding_factor!(2, 5, 8, 16, let $n = $factor => $function)
+        dynamic_folding_factor!(2, 4, 8, 16, let $n = $factor => $function)
     };
     ($($values: literal,)+ let $n:ident = $factor: expr => $function: expr) => {
         match $factor {
