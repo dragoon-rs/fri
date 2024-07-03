@@ -5,7 +5,11 @@ use ark_ff::PrimeField;
 use ark_serialize::CanonicalSerialize;
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use fri::{
-    algorithms::Blake3, dynamic_folding_factor, frida::{nth_evaluations, FridaBuilder, FridaCommitment}, rng::FriChallenger, utils::{to_evaluations, HasherExt}
+    algorithms::Blake3,
+    dynamic_folding_factor,
+    frida::{nth_evaluations, FridaBuilder, FridaCommitment},
+    rng::FriChallenger,
+    utils::{to_evaluations, HasherExt},
 };
 use fri_test_utils::{
     random_file, Fq, BLOWUP_FACTOR, NUMBER_OF_POLYNOMIALS, NUM_QUERIES, POLY_COEFFS_LEN,
@@ -57,20 +61,20 @@ impl<'a> FridaParametricBencher<'a> {
 
     /// Sets the parameter that is tested by this [`FridaParameterBencher`].
     /// The default value is [`ParameterOfInterest::FileSize`].
-    /// 
-    /// `add_parameters` should not be called (and should not have been called until now) twice with the 
+    ///
+    /// `add_parameters` should not be called (and should not have been called until now) twice with the
     // same value for this parameter.
     fn set_parameter_of_interest(&mut self, parameter: ParameterOfInterest) {
         self.interest = parameter;
     }
 
     /// Adds a set of parameters to be benchmarked.
-    /// 
+    ///
     /// - `byte_size` must be `Fq::MODULUS_BIT_SIZE / 8 * k * m`. It is still required as an argument
     ///   because it is computed anyway in the caller functions.
     /// - Note that `k` is the degree bound of the polynomial; the actual domain size in FRI will be
-    ///   [`BLOWUP_FACTOR`] times greater. 
-    /// - `folding_factor` must be 2, 4, 8 or 16. 
+    ///   [`BLOWUP_FACTOR`] times greater.
+    /// - `folding_factor` must be 2, 4, 8 or 16.
     /// - `k` must be a power of `folding_factor`
     fn add_parameters(&mut self, folding_factor: usize, byte_size: usize, k: usize, m: usize) {
         self.parameters.push((folding_factor, byte_size, k, m));
@@ -81,7 +85,7 @@ impl<'a> FridaParametricBencher<'a> {
     ///  - the total byte size of the commitment + the proofs,
     ///  - the time to verify a Frida commitment,
     ///  - the time to verify the proof for a random shard in the domain.
-    /// 
+    ///
     /// This blocks until all the benches complete. This panics if any of the combination of parameters specified
     /// in `add_parameters` is invalid.
     fn bench(self) {
@@ -92,8 +96,11 @@ impl<'a> FridaParametricBencher<'a> {
         let mut group_prove = c.benchmark_group(format!("prove_time_{id}"));
         group_prove.sample_size(10);
 
-        let mut sizes =
+        let mut proof_sizes =
             csv::Writer::from_path(format!("target/proof_sizes/proof_size_{id}.csv")).unwrap();
+        proof_sizes
+            .write_record(&["input", "commit_size", "proof_size"])
+            .unwrap();
 
         for &(folding_factor, file_size, k, m) in &self.parameters {
             let parameter = self.interest.get(folding_factor, file_size, k, m);
@@ -113,18 +120,22 @@ impl<'a> FridaParametricBencher<'a> {
 
             let builder: _ = frida_builder(folding_factor, &random_evaluations(k, m));
 
-            let mut size = 0;
+            let mut proof_size = 0;
             for i in 0..(k * BLOWUP_FACTOR) {
-                size += builder.prove_shards(&[i]).compressed_size();
+                proof_size += builder.prove_shards(&[i]).compressed_size();
             }
-            size += FridaCommitment::from(builder).compressed_size();
+            let commit_size = FridaCommitment::from(builder).compressed_size();
 
-            sizes
-                .write_record(&[parameter.to_string(), size.to_string()])
+            proof_sizes
+                .write_record(&[
+                    parameter.to_string(),
+                    commit_size.to_string(),
+                    proof_size.to_string(),
+                ])
                 .unwrap();
         }
         group_prove.finish();
-        sizes.flush().unwrap();
+        proof_sizes.flush().unwrap();
 
         // BENCH VERIFY COMMIT
         let mut group_verify_commit = c.benchmark_group(format!("verify_commit_time_{id}"));
@@ -214,7 +225,12 @@ fn parametric_num_poly(c: &mut Criterion, k: usize, max_file_size: usize, foldin
     bencher.bench()
 }
 
-fn parametric_degree_bound(c: &mut Criterion, m: usize, max_file_size: usize, folding_factor: usize) {
+fn parametric_degree_bound(
+    c: &mut Criterion,
+    m: usize,
+    max_file_size: usize,
+    folding_factor: usize,
+) {
     let mut bencher = FridaParametricBencher::new(c, format!("k=#_m={m},N={folding_factor}"));
 
     let mut k = folding_factor;
@@ -230,7 +246,8 @@ fn parametric_degree_bound(c: &mut Criterion, m: usize, max_file_size: usize, fo
 }
 
 fn parametric_degree_bound_fixed_size(c: &mut Criterion, file_size: usize, folding_factor: usize) {
-    let mut bencher = FridaParametricBencher::new(c, format!("k=#_m=#,N={folding_factor},nbytes={file_size}"));
+    let mut bencher =
+        FridaParametricBencher::new(c, format!("k=#_m=#,N={folding_factor},nbytes={file_size}"));
     bencher.set_parameter_of_interest(ParameterOfInterest::DegreeBound);
 
     let mut k = folding_factor;
@@ -296,13 +313,13 @@ fn measure_frida(c: &mut Criterion) {
 
     // Increasing file size with fixed `m`
     parametric_degree_bound(c, NUMBER_OF_POLYNOMIALS, MAX_FILE_SIZE, FOLDING_FACTOR);
-    
+
     // Finding best folding factor
     parametric_folding_factor(c, K2, NUMBER_OF_POLYNOMIALS);
 
     // Finding best `k` for fixed file size
     parametric_degree_bound_fixed_size(c, 67_108_864, FOLDING_FACTOR);
-
+    
 }
 
 criterion_group!(benches, measure_frida);
