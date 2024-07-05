@@ -319,7 +319,6 @@ fn measure_frida(c: &mut Criterion) {
 
     // Finding best `k` for fixed file size
     parametric_degree_bound_fixed_size(c, 67_108_864, FOLDING_FACTOR);
-    
 }
 
 criterion_group!(benches, measure_frida);

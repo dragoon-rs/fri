@@ -23,7 +23,7 @@ impl<const N: usize> AssertPowerOfTwo<N> {
 }
 
 /// A transparent wrapper for a [`rs_merkle::MerkleProof`] that implements additional utility traits.
-/// 
+///
 /// This allows to use `#[derive(...)]` in objects that use Merkle proofs.
 #[derive(From, Into, AsRef, Deref)]
 #[repr(transparent)]
@@ -111,13 +111,16 @@ pub trait HasherExt: Hasher {
     ///
     /// `buffer` is used to store the serialized bytes. Its content when the function returns is unspecified.
     /// If it is not empty initially, it will be cleared first.
-    fn hash_item_with<S: CanonicalSerialize>(value: &S, buffer: &mut Vec<u8>) -> Self::Hash;
+    fn hash_item_with<S: CanonicalSerialize + ?Sized>(
+        value: &S,
+        buffer: &mut Vec<u8>,
+    ) -> Self::Hash;
 
     /// Uses the implementation of [`CanonicalSerialize`] to convert `value` into bytes then return the
     /// hash value of those bytes.
     ///
     /// This allocates a new temporary vector to store the serialized bytes.
-    fn hash_item<S: CanonicalSerialize>(value: &S) -> Self::Hash {
+    fn hash_item<S: CanonicalSerialize + ?Sized>(value: &S) -> Self::Hash {
         Self::hash_item_with(value, &mut Vec::with_capacity(value.compressed_size()))
     }
     /// Convenience function to hash a slice of values.
@@ -131,7 +134,10 @@ pub trait HasherExt: Hasher {
     }
 }
 impl<H: Hasher> HasherExt for H {
-    fn hash_item_with<S: CanonicalSerialize>(value: &S, buffer: &mut Vec<u8>) -> Self::Hash {
+    fn hash_item_with<S: CanonicalSerialize + ?Sized>(
+        value: &S,
+        buffer: &mut Vec<u8>,
+    ) -> Self::Hash {
         buffer.clear();
         value
             .serialize_compressed(&mut *buffer)

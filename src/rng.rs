@@ -179,6 +179,10 @@ impl<R> MemoryRng<R> {
     pub fn last_positions(&self) -> &[usize] {
         &self.last_positions
     }
+    /// Same as [`MemoryRng::last_positions`] but returns a mutable reference.
+    pub fn last_positions_mut(&mut self) -> &mut Vec<usize> {
+        &mut self.last_positions
+    }
     pub fn into_inner(self) -> R {
         self.inner
     }

@@ -39,6 +39,7 @@ pub struct FridaBuilder<F, H: Hasher> {
     tree: MerkleTree<H>,
     fri_proof: FriProof<F, H>,
     zipped_queries: Vec<F>,
+    zipped_proof: MerkleProof<H>,
     num_poly: usize,
 }
 
@@ -88,16 +89,22 @@ impl<F: FftField, H: Hasher> FridaBuilder<F, H> {
         let mut rng = MemoryRng::from(rng);
         let proof = build_proof(commitments, &mut rng, num_queries);
 
-        let positions = rng.last_positions();
+        let mut positions = std::mem::take(rng.last_positions_mut());
         let zipped_queries = positions
             .iter()
             .flat_map(|&pos| nth_evaluations(evaluations, pos))
             .collect();
 
+        // `tree.proof` requires a sorted slice of positions without duplicates
+        positions.sort_unstable();
+        positions.dedup();
+        let zipped_proof = tree.proof(&positions).into();
+
         Self {
             tree,
             fri_proof: proof,
             zipped_queries,
+            zipped_proof,
             num_poly: evaluations.len(),
         }
     }
@@ -128,6 +135,7 @@ impl<F: FftField, H: Hasher> FridaBuilder<F, H> {
 pub struct FridaCommitment<F, H: Hasher> {
     zipped_root: H::Hash,
     zipped_queries: Vec<F>,
+    zipped_proof: MerkleProof<H>,
     num_poly: usize,
     fri_proof: FriProof<F, H>,
 }
@@ -157,19 +165,40 @@ impl<F: FftField, H: Hasher> FridaCommitment<F, H> {
         self.fri_proof
             .verify::<N, _>(&mut rng, num_queries, degree_bound, domain_size)?;
 
-        let positions = rng.last_positions();
-        let folded_postions = fold_positions(positions, domain_size / N);
+        let mut positions = std::mem::take(rng.last_positions_mut());
+        let folded_postions = fold_positions(&positions, domain_size / N);
         let queried = self
             .fri_proof
             .first_layer()
-            .queried_evaluations::<N>(positions, &folded_postions, domain_size)
+            .queried_evaluations::<N>(&positions, &folded_postions, domain_size)
             .unwrap();
 
         if queried.len() * self.num_poly != self.zipped_queries.len() {
             return Err(FridaError::InvalidZippedQueries);
         }
-        for i in 0..queried.len() {
-            if queried[i]
+
+        let mut indices = (0..positions.len()).collect::<Vec<_>>();
+        indices.sort_unstable_by(|&i, &j| positions[i].cmp(&positions[j]));
+        indices.dedup_by(|&mut a, &mut b| positions[a] == positions[b]);
+
+        positions.sort_unstable();
+        positions.dedup();
+
+        let hashes = indices
+            .iter()
+            .map(|i| {
+                H::hash_item(&self.zipped_queries[(i * self.num_poly)..((i + 1) * self.num_poly)])
+            })
+            .collect::<Vec<_>>();
+        if !self
+            .zipped_proof
+            .verify(self.zipped_root, &positions, &hashes, domain_size)
+        {
+            return Err(FridaError::InvalidZippedQueries);
+        }
+
+        for (i, &query) in queried.iter().enumerate() {
+            if query
                 != evaluate(
                     self.zipped_queries[(i * self.num_poly)..((i + 1) * self.num_poly)]
                         .iter()
@@ -191,6 +220,7 @@ impl<F: FftField, H: Hasher> From<FridaBuilder<F, H>> for FridaCommitment<F, H> 
         Self {
             zipped_root,
             zipped_queries: value.zipped_queries,
+            zipped_proof: value.zipped_proof,
             fri_proof: value.fri_proof,
             num_poly: value.num_poly,
         }
