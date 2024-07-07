@@ -37,7 +37,8 @@ sha3_asm = ["sha3", "sha3/asm"]
 blake3 = ["dep:blake3"]
 frida = []
 frida_pcs = ["frida", "dep:proofs", "dep:fec"]
-default = ["sha3", "blake3", "frida"]
+interpolation = []
+default = ["sha3", "blake3", "frida", "interpolation"]
 
 [[bench]]
 name = "fri"

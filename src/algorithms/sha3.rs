@@ -2,7 +2,7 @@ use rs_merkle::Hasher;
 use sha3::{digest::FixedOutput, Digest};
 
 /// Sha3-256 implementation of the [`rs_merkle::Hasher`] trait.
-/// 
+///
 /// See documentation of crate [`sha3`].
 #[derive(Clone, Copy, Debug)]
 pub struct Sha3_256;
@@ -18,7 +18,7 @@ impl Hasher for Sha3_256 {
 }
 
 /// Sha3-512 implementation of the [`rs_merkle::Hasher`] trait.
-/// 
+///
 /// See documentation of crate [`sha3`].
 #[derive(Clone, Copy, Debug)]
 pub struct Sha3_512;

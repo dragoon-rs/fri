@@ -11,13 +11,15 @@ use folding::{fold_positions, FoldedEvaluationsSlice};
 use fri_proc_macros::{CanonicalDeserializeAlt, CanonicalSerializeAlt};
 use rng::ReseedableRng;
 use rs_merkle::Hasher;
-use utils::{to_evaluations, AssertPowerOfTwo, HasherExt, MerkleProof};
+use utils::{horner_evaluate, to_evaluations, AssertPowerOfTwo, HasherExt, MerkleProof};
 
 pub mod algorithms;
 pub mod commit;
 pub mod folding;
 #[cfg(feature = "frida")]
 pub mod frida;
+#[cfg(feature = "interpolation")]
+pub mod interpolation;
 pub mod rng;
 pub mod utils;
 
@@ -327,11 +329,8 @@ impl<F: FftField, H: Hasher> FriProof<F, H> {
         {
             return Err(VerifyError::InvalidRemainderDegree);
         }
-        let remainder = DensePolynomial {
-            coeffs: self.remainder.clone(),
-        };
         for (position, &evaluation) in zip(positions, &evaluations) {
-            if remainder.evaluate(&root.pow([position as u64])) != evaluation {
+            if horner_evaluate(&self.remainder, root.pow([position as u64])) != evaluation {
                 return Err(VerifyError::InvalidRemainder);
             }
         }

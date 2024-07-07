@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, fmt::Debug};
 
-use ark_ff::FftField;
+use ark_ff::{FftField, Field};
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Valid};
 use derive_more::{AsRef, Deref, From, Into};
@@ -221,4 +221,16 @@ pub fn to_polynomial<F: FftField>(mut evaluations: Vec<F>, degree_bound: usize) 
 
     evaluations.truncate(degree_bound);
     evaluations
+}
+
+/// Computes `P(alpha)` using Horner's method, where `P(X) = coeffs[0] + X coeffs[1] ... + X^{n-1} coeffs[n-1]`
+#[inline]
+pub fn horner_evaluate<F: Field, I: IntoIterator>(coeffs: I, alpha: F) -> F
+where
+    I::IntoIter: DoubleEndedIterator,
+    I::Item: Borrow<F>,
+{
+    coeffs
+        .into_iter()
+        .rfold(F::ZERO, |result, eval| result * alpha + eval.borrow())
 }

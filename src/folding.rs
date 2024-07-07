@@ -4,11 +4,9 @@ use std::{
 };
 
 use ark_ff::FftField;
-use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
-};
+use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 
-use crate::AssertPowerOfTwo;
+use crate::{utils::horner_evaluate, AssertPowerOfTwo};
 
 /// An owned view over folded evaluations.
 /// `N` is the folding factor. It should be a power of two.
@@ -261,12 +259,9 @@ pub fn reduce_polynomial<const N: usize, F: FftField>(
         buffer.extend_from_slice(batch);
         domain.ifft_in_place(&mut buffer);
 
-        let poly = DensePolynomial { coeffs: buffer };
-        new_evaluations.push(poly.evaluate(&(alpha * offset)));
+        new_evaluations.push(horner_evaluate(&buffer, alpha * offset));
 
         offset *= root_inv;
-
-        buffer = poly.coeffs;
         buffer.clear();
     }
     new_evaluations

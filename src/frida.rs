@@ -13,7 +13,7 @@ use crate::{
     build_proof,
     folding::fold_positions,
     rng::{MemoryRng, ReseedableRng},
-    utils::{HasherExt, MerkleProof},
+    utils::{horner_evaluate, HasherExt, MerkleProof},
     FriCommitments, FriProof, VerifyError,
 };
 
@@ -199,10 +199,8 @@ impl<F: FftField, H: Hasher> FridaCommitment<F, H> {
 
         for (i, &query) in queried.iter().enumerate() {
             if query
-                != evaluate(
-                    self.zipped_queries[(i * self.num_poly)..((i + 1) * self.num_poly)]
-                        .iter()
-                        .copied(),
+                != horner_evaluate(
+                    &self.zipped_queries[(i * self.num_poly)..((i + 1) * self.num_poly)],
                     alpha,
                 )
             {
@@ -233,19 +231,9 @@ impl<F: FftField, H: Hasher> From<FridaBuilder<F, H>> for FridaCommitment<F, H> 
 pub fn batch_polynomials<F: Field>(evaluations: &[Vec<F>], alpha: F) -> Vec<F> {
     let mut combined_poly = Vec::with_capacity(evaluations[0].len());
     for i in 0..evaluations[0].len() {
-        combined_poly.push(evaluate(nth_evaluations(evaluations, i), alpha))
+        combined_poly.push(horner_evaluate(nth_evaluations(evaluations, i), alpha))
     }
     combined_poly
-}
-
-#[inline]
-fn evaluate<F: Field, I: IntoIterator<Item = F>>(coeffs: I, alpha: F) -> F
-where
-    I::IntoIter: DoubleEndedIterator,
-{
-    coeffs
-        .into_iter()
-        .rfold(F::ZERO, |result, eval| result * alpha + eval)
 }
 
 /// Returns `(poly[n] for poly in evaluations)`
