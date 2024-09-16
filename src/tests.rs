@@ -21,13 +21,13 @@ use crate::{
 #[test]
 fn test_reduction() {
     for i in 0..NUMBER_OF_POLYNOMIALS {
-        println!("Testing on polynomial {i}");
+        println!("    Testing on polynomial {i} / {NUMBER_OF_POLYNOMIALS}");
 
         let poly = rand_vector(POLY_COEFFS_LEN);
         let poly2 = convert_many(&poly);
 
         do_for_multiple_folding_factors!(FACTOR = 2, 4, 8, 16 => {
-            println!("--Folding factor={FACTOR}");
+            println!("        --Folding factor={FACTOR}");
             let mut evaluations = prepare_winterfell_poly(poly.clone());
             let mut evaluations2 = to_evaluations(poly2.clone(), DOMAIN_SIZE);
             assert_eq!(convert_many(&evaluations), evaluations2);
@@ -53,14 +53,14 @@ fn test_prove_verify() {
     let poly: Vec<Fq> = (0..POLY_COEFFS_LEN).map(|_| rng.gen()).collect();
 
     do_for_multiple_folding_factors!(FACTOR = 2, 4, 8, 16 => {
-        println!("--Folding factor={FACTOR}");
+        println!("    --Folding factor={FACTOR}");
 
         let mut rng = FriChallenger::<Blake3>::default();
         let commitments = commit_polynomial::<FACTOR, _, Blake3, _>(poly.clone(), &mut rng, BLOWUP_FACTOR, 1);
         let proof = build_proof(commitments, &mut rng, NUM_QUERIES);
 
         rng.reset();
-        proof.verify::<FACTOR, _>(rng.clone(), NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE).unwrap();
+        assert!(proof.verify::<FACTOR, _>(rng.clone(), NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE).is_ok());
 
         assert!(proof.verify::<{FACTOR*2}, _>(rng.clone(), NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE).is_err());
         assert!(proof.verify::<{FACTOR/2}, _>(rng.clone(), NUM_QUERIES, POLY_COEFFS_LEN, DOMAIN_SIZE).is_err());
@@ -79,7 +79,7 @@ fn test_serialization() {
     let poly: Vec<Fq> = (0..POLY_COEFFS_LEN).map(|_| rng.gen()).collect();
 
     do_for_multiple_folding_factors!(FACTOR = 2, 4, 8, 16 => {
-        println!("--Folding factor={FACTOR}");
+        println!("    --Folding factor={FACTOR}");
 
         let mut rng = FriChallenger::<Blake3>::default();
         let commitments = commit_polynomial::<FACTOR, _, Blake3, _>(poly.clone(), &mut rng, BLOWUP_FACTOR, 1);

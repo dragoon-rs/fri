@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 use std::iter::zip;
 
 use ark_ff::{FftField, Field};
@@ -27,14 +28,27 @@ pub mod utils;
 mod tests;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+/// errors that can happen when verifying a FRI proof
 pub enum VerifyError {
     BadFoldingFactor(usize),
+    /// when $|D_i| \neq 2^\bullet$ or $|D_i| \leq k_i$
     BadDomainSize(usize),
+    /// when $k_i \neq 2^\bullet$
     BadDegreeBound(usize),
-    DegreeTruncation { depth: usize },
-    CommitmentMismatch { depth: usize },
-    InvalidFolding { depth: usize },
-    WrongNumberOfEvaluations { depth: usize },
+    /// when $|D_i| \neq 0 \quad\text{mod}\quad N$ or $k_i \neq 0 \quad\text{mod}\quad N$
+    DegreeTruncation {
+        depth: usize,
+    },
+    /// one of the commitment layers did not verify
+    CommitmentMismatch {
+        depth: usize,
+    },
+    InvalidFolding {
+        depth: usize,
+    },
+    WrongNumberOfEvaluations {
+        depth: usize,
+    },
     InvalidRemainderDegree,
     InvalidRemainder,
 }

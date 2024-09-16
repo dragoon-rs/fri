@@ -4,28 +4,30 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["proc_macro"]
+members = [ "proc_macro", "test_utils" ]
+
+[workspace.dependencies]
+ark-serialize = { version = "0.4.2", default-features = false }
+winter-math = "0.9"
 
 [lib]
 
 [dependencies]
 ark-ff = { version = "0.4.2", default-features = false }
 ark-poly = { version = "0.4.2", default-features = false }
-ark-serialize = { version = "0.4.2", default-features = false }
+ark-serialize = { workspace = true }
 rs_merkle = { version = "1.4.2", default-features = false }
 derive_more = "0.99.18"
 derive-where = "1.2.7"
 fri_proc_macros = { path = "proc_macro" }
 blake3 = { version = "1.5.1", default-features = false, optional = true }
 sha3 = { version = "0.10.8", default-features = false, optional = true }
-proofs = { git = "https://gitlab.isae-supaero.fr/dragoon/pcs-fec-id.git", optional = true }
-fec = { git = "https://gitlab.isae-supaero.fr/dragoon/pcs-fec-id.git", optional = true }
 
 [dev-dependencies]
 winter-fri = "0.9"
 winter-utils = "0.9"
 winter-rand-utils = "0.9"
-winter-math = "0.9"
+winter-math = { workspace = true }
 rand = "0.8.5"
 criterion = "0.5.1"
 fri_test_utils = { path = "test_utils" }
@@ -36,7 +38,6 @@ sha3 = ["dep:sha3"]
 sha3_asm = ["sha3", "sha3/asm"]
 blake3 = ["dep:blake3"]
 frida = []
-frida_pcs = ["frida", "dep:proofs", "dep:fec"]
 interpolation = []
 default = ["sha3", "blake3", "frida", "interpolation"]
 

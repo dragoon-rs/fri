@@ -25,6 +25,21 @@ impl<const N: usize> AssertPowerOfTwo<N> {
 /// A transparent wrapper for a [`rs_merkle::MerkleProof`] that implements additional utility traits.
 ///
 /// This allows to use `#[derive(...)]` in objects that use Merkle proofs.
+///
+/// # Example
+/// ```ignore
+/// // does NOT compile
+/// #[derive(Clone)]
+/// struct Foo<H: Hasher> {
+///     foo: rs_merkle::MerkleProof<H>,
+/// }
+///
+/// // does compile
+/// #[derive(Clone)]
+/// struct Bar<H: Hasher> {
+///     bar: utils::MerkleProof<H>,
+/// }
+/// ```
 #[derive(From, Into, AsRef, Deref)]
 #[repr(transparent)]
 pub struct MerkleProof<H: Hasher>(rs_merkle::MerkleProof<H>);
@@ -105,6 +120,7 @@ impl<H: Hasher> Borrow<rs_merkle::MerkleProof<H>> for MerkleProof<H> {
     }
 }
 
+/// An extension of the [`Hasher`] trait that computes hashes from serialized bytes.
 pub trait HasherExt: Hasher {
     /// Uses the implementation of [`CanonicalSerialize`] to convert `value` into bytes then return the
     /// hash value of those bytes.
@@ -146,6 +162,8 @@ impl<H: Hasher> HasherExt for H {
     }
 }
 
+/// An extension for the [`MerkleTree`] that builds a _Merkle Tree_ from a set of polynomial
+/// evaluations.
 pub(crate) trait MerkleTreeExt {
     /// Hash the evaluations and create a Merkle tree using the hashes as the leaves.
     fn from_evaluations<S: CanonicalSerialize>(evaluations: &[S]) -> Self;
@@ -164,28 +182,25 @@ impl<H: Hasher> MerkleTreeExt for MerkleTree<H> {
 ///
 /// # Example
 /// ```
-/// use ark_ff::FftField;
-/// use ark_poly::{Polynomial, DenseUVPolynomial, univariate::DensePolynomial};
-/// use rand::{thread_rng, Rng};
-///
-/// use fri::utils::{to_evaluations, to_polynomial};
-/// use fri_test_utils::Fq;
-///
+/// # use ark_ff::FftField;
+/// # use ark_poly::{Polynomial, DenseUVPolynomial, univariate::DensePolynomial};
+/// # use rand::{thread_rng, Rng};
+/// #
+/// # use fri::utils::{to_evaluations, to_polynomial};
+/// # use fri_test_utils::Fq;
+/// #
 /// const POLY_COEFFS_LEN: usize = 32;
 /// const DOMAIN_SIZE: usize = 128;
 ///
-/// let mut rng = thread_rng();
-/// let polynomial: Vec<Fq> = (0..POLY_COEFFS_LEN).map(|_| rng.gen()).collect();
-/// let evaluations = to_evaluations(polynomial.clone(), DOMAIN_SIZE);
-/// let dense_poly = DensePolynomial::from_coefficients_vec(polynomial.clone());
+/// # let mut rng = thread_rng();
+/// let polynomial = DensePolynomial::rand(POLY_COEFFS_LEN - 1, &mut rng);
+/// let evaluations = to_evaluations(polynomial.coeffs.clone(), DOMAIN_SIZE);
 ///
 /// let w = Fq::get_root_of_unity(DOMAIN_SIZE as u64).unwrap();
+/// assert_eq!(evaluations[1], polynomial.evaluate(&w));
 ///
-/// assert_eq!(evaluations[1], dense_poly.evaluate(&w));
-///
-/// let interpolated = to_polynomial(evaluations, polynomial.len());
-///
-/// assert_eq!(polynomial, interpolated);
+/// let interpolated = to_polynomial(evaluations, POLY_COEFFS_LEN);
+/// assert_eq!(polynomial.coeffs, interpolated);
 /// ```
 #[inline]
 pub fn to_evaluations<F: FftField>(mut polynomial: Vec<F>, domain_size: usize) -> Vec<F> {

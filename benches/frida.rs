@@ -22,7 +22,6 @@ enum ParameterOfInterest {
     #[default]
     FileSize,
     DegreeBound,
-    #[allow(dead_code)]
     NumberOfPolynomials,
     FoldingFactor,
 }
@@ -88,12 +87,12 @@ impl<'a> FridaParametricBencher<'a> {
     ///
     /// This blocks until all the benches complete. This panics if any of the combination of parameters specified
     /// in `add_parameters` is invalid.
-    fn bench(self) {
+    fn bench(self, bf: usize, q: usize) {
         let c = self.criterion;
         let id = &self.id;
 
         // BENCH BUILD PROOF
-        let mut group_prove = c.benchmark_group(format!("prove_time_{id}"));
+        let mut group_prove = c.benchmark_group(format!("prove {id}"));
         group_prove.sample_size(10);
 
         let mut proof_sizes =
@@ -108,9 +107,9 @@ impl<'a> FridaParametricBencher<'a> {
                 b.iter_batched(
                     || random_evaluations(k, m),
                     |file_evals| {
-                        let builder: _ = frida_builder(folding_factor, &file_evals);
+                        let builder: _ = frida_builder(folding_factor, &file_evals, bf, q);
 
-                        for i in 0..(k * BLOWUP_FACTOR) {
+                        for i in 0..(k * bf) {
                             black_box(builder.prove_shards(&[i]));
                         }
                     },
@@ -118,10 +117,10 @@ impl<'a> FridaParametricBencher<'a> {
                 );
             });
 
-            let builder: _ = frida_builder(folding_factor, &random_evaluations(k, m));
+            let builder: _ = frida_builder(folding_factor, &random_evaluations(k, m), bf, q);
 
             let mut proof_size = 0;
-            for i in 0..(k * BLOWUP_FACTOR) {
+            for i in 0..(k * bf) {
                 proof_size += builder.prove_shards(&[i]).compressed_size();
             }
             let commit_size = FridaCommitment::from(builder).compressed_size();
@@ -138,7 +137,7 @@ impl<'a> FridaParametricBencher<'a> {
         proof_sizes.flush().unwrap();
 
         // BENCH VERIFY COMMIT
-        let mut group_verify_commit = c.benchmark_group(format!("verify_commit_time_{id}"));
+        let mut group_verify_commit = c.benchmark_group(format!("verify_commit {id}"));
         group_verify_commit.sample_size(10);
         for &(folding_factor, file_size, k, m) in &self.parameters {
             group_verify_commit.bench_with_input(
@@ -150,6 +149,8 @@ impl<'a> FridaParametricBencher<'a> {
                             FridaCommitment::from(frida_builder(
                                 folding_factor,
                                 &random_evaluations(k, m),
+                                bf,
+                                q,
                             ))
                         },
                         |commit| {
@@ -157,9 +158,9 @@ impl<'a> FridaParametricBencher<'a> {
                                 commit
                                     .verify::<N, _>(
                                         FriChallenger::<Blake3>::default(),
-                                        NUM_QUERIES,
+                                        q,
                                         k,
-                                        k * BLOWUP_FACTOR,
+                                        k * bf,
                                     )
                                     .unwrap())
                         },
@@ -171,7 +172,7 @@ impl<'a> FridaParametricBencher<'a> {
         group_verify_commit.finish();
 
         // BENCH VERIFY ONE PROOF
-        let mut group_verify_proof = c.benchmark_group(format!("verify_proof_time_{id}"));
+        let mut group_verify_proof = c.benchmark_group(format!("verify_proof {id}"));
         group_verify_proof.sample_size(10);
         for &(folding_factor, file_size, k, m) in &self.parameters {
             group_verify_proof.bench_with_input(
@@ -181,8 +182,8 @@ impl<'a> FridaParametricBencher<'a> {
                     b.iter_batched(
                         || {
                             let evals = random_evaluations(k, m);
-                            let builder: _ = frida_builder(folding_factor, &evals);
-                            let pos = thread_rng().gen_range(0..(k * BLOWUP_FACTOR));
+                            let builder: _ = frida_builder(folding_factor, &evals, bf, q);
+                            let pos = thread_rng().gen_range(0..(k * bf));
                             let proof = builder.prove_shards(&[pos]);
                             (
                                 FridaCommitment::from(builder),
@@ -194,12 +195,7 @@ impl<'a> FridaParametricBencher<'a> {
                             )
                         },
                         |(commit, proof, pos, eval)| {
-                            assert!(proof.verify(
-                                commit.tree_root(),
-                                &[pos],
-                                &[eval],
-                                k * BLOWUP_FACTOR
-                            ))
+                            assert!(proof.verify(commit.tree_root(), &[pos], &[eval], k * bf))
                         },
                         BatchSize::LargeInput,
                     )
@@ -210,8 +206,17 @@ impl<'a> FridaParametricBencher<'a> {
     }
 }
 
-fn parametric_num_poly(c: &mut Criterion, k: usize, max_file_size: usize, folding_factor: usize) {
-    let mut bencher = FridaParametricBencher::new(c, format!("k={k}_m=#,N={folding_factor}"));
+fn parametric_num_poly(
+    c: &mut Criterion,
+    k: usize,
+    max_file_size: usize,
+    folding_factor: usize,
+    bf: usize,
+    q: usize,
+) {
+    let mut bencher =
+        FridaParametricBencher::new(c, format!("k={k},m=#,N={folding_factor},bf={bf},q={q}"));
+    bencher.set_parameter_of_interest(ParameterOfInterest::NumberOfPolynomials);
 
     let mut num_poly = 1usize;
     let mut byte_size = k * Fq::MODULUS_BIT_SIZE as usize / 8;
@@ -222,7 +227,7 @@ fn parametric_num_poly(c: &mut Criterion, k: usize, max_file_size: usize, foldin
         byte_size *= 2;
     }
 
-    bencher.bench()
+    bencher.bench(bf, q)
 }
 
 fn parametric_degree_bound(
@@ -230,8 +235,12 @@ fn parametric_degree_bound(
     m: usize,
     max_file_size: usize,
     folding_factor: usize,
+    bf: usize,
+    q: usize,
 ) {
-    let mut bencher = FridaParametricBencher::new(c, format!("k=#_m={m},N={folding_factor}"));
+    let mut bencher =
+        FridaParametricBencher::new(c, format!("k=#,m={m},N={folding_factor},bf={bf},q={q}"));
+    bencher.set_parameter_of_interest(ParameterOfInterest::DegreeBound);
 
     let mut k = folding_factor;
     let mut byte_size = k * m * Fq::MODULUS_BIT_SIZE as usize / 8;
@@ -242,12 +251,20 @@ fn parametric_degree_bound(
         byte_size *= folding_factor;
     }
 
-    bencher.bench()
+    bencher.bench(bf, q)
 }
 
-fn parametric_degree_bound_fixed_size(c: &mut Criterion, file_size: usize, folding_factor: usize) {
-    let mut bencher =
-        FridaParametricBencher::new(c, format!("k=#_m=#,N={folding_factor},nbytes={file_size}"));
+fn parametric_degree_bound_fixed_size(
+    c: &mut Criterion,
+    file_size: usize,
+    folding_factor: usize,
+    bf: usize,
+    q: usize,
+) {
+    let mut bencher = FridaParametricBencher::new(
+        c,
+        format!("k=#,m=#,N={folding_factor},nbytes={file_size},bf={bf},q={q}"),
+    );
     bencher.set_parameter_of_interest(ParameterOfInterest::DegreeBound);
 
     let mut k = folding_factor;
@@ -265,11 +282,11 @@ fn parametric_degree_bound_fixed_size(c: &mut Criterion, file_size: usize, foldi
         );
     }
 
-    bencher.bench()
+    bencher.bench(bf, q)
 }
 
-fn parametric_folding_factor(c: &mut Criterion, k: usize, m: usize) {
-    let mut bencher = FridaParametricBencher::new(c, format!("k={k}_m={m},N=#"));
+fn parametric_folding_factor(c: &mut Criterion, k: usize, m: usize, bf: usize, q: usize) {
+    let mut bencher = FridaParametricBencher::new(c, format!("k={k},m={m},N=#,bf={bf},q={q}"));
     bencher.set_parameter_of_interest(ParameterOfInterest::FoldingFactor);
 
     let file_size = m * k * Fq::MODULUS_BIT_SIZE as usize / 8;
@@ -278,7 +295,7 @@ fn parametric_folding_factor(c: &mut Criterion, k: usize, m: usize) {
         bencher.add_parameters(folding_factor, file_size, k, m);
     }
 
-    bencher.bench()
+    bencher.bench(bf, q)
 }
 
 fn random_evaluations(k: usize, m: usize) -> Vec<Vec<Fq>> {
@@ -288,14 +305,19 @@ fn random_evaluations(k: usize, m: usize) -> Vec<Vec<Fq>> {
         .collect()
 }
 
-fn frida_builder(folding_factor: usize, evaluations: &[Vec<Fq>]) -> FridaBuilder<Fq, Blake3> {
+fn frida_builder(
+    folding_factor: usize,
+    evaluations: &[Vec<Fq>],
+    bf: usize,
+    q: usize,
+) -> FridaBuilder<Fq, Blake3> {
     dynamic_folding_factor!(let N = folding_factor =>
         FridaBuilder::<_, Blake3>::new::<N, _>(
             evaluations,
             FriChallenger::<Blake3>::default(),
-            BLOWUP_FACTOR,
+            bf,
             1,
-            NUM_QUERIES,
+            q,
     ))
 }
 
@@ -308,17 +330,38 @@ fn measure_frida(c: &mut Criterion) {
     const FOLDING_FACTOR: usize = 4;
 
     // Increasing file size with fixed `k`
-    parametric_num_poly(c, K1, MAX_FILE_SIZE, FOLDING_FACTOR);
-    parametric_num_poly(c, K2, MAX_FILE_SIZE, FOLDING_FACTOR);
+    parametric_num_poly(
+        c,
+        K1,
+        MAX_FILE_SIZE,
+        FOLDING_FACTOR,
+        BLOWUP_FACTOR,
+        NUM_QUERIES,
+    );
+    parametric_num_poly(
+        c,
+        K2,
+        MAX_FILE_SIZE,
+        FOLDING_FACTOR,
+        BLOWUP_FACTOR,
+        NUM_QUERIES,
+    );
 
     // Increasing file size with fixed `m`
-    parametric_degree_bound(c, NUMBER_OF_POLYNOMIALS, MAX_FILE_SIZE, FOLDING_FACTOR);
+    parametric_degree_bound(
+        c,
+        NUMBER_OF_POLYNOMIALS,
+        MAX_FILE_SIZE,
+        FOLDING_FACTOR,
+        BLOWUP_FACTOR,
+        NUM_QUERIES,
+    );
 
     // Finding best folding factor
-    parametric_folding_factor(c, K2, NUMBER_OF_POLYNOMIALS);
+    parametric_folding_factor(c, K2, NUMBER_OF_POLYNOMIALS, BLOWUP_FACTOR, NUM_QUERIES);
 
     // Finding best `k` for fixed file size
-    parametric_degree_bound_fixed_size(c, 67_108_864, FOLDING_FACTOR);
+    parametric_degree_bound_fixed_size(c, 67_108_864, FOLDING_FACTOR, BLOWUP_FACTOR, NUM_QUERIES);
 }
 
 criterion_group!(benches, measure_frida);

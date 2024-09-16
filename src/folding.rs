@@ -1,3 +1,4 @@
+//! Takes care of folding the polynomials to reduce their degrees
 use std::{
     borrow::{Borrow, Cow},
     ops::{Deref, Index},
@@ -12,7 +13,7 @@ use crate::{utils::horner_evaluate, AssertPowerOfTwo};
 /// `N` is the folding factor. It should be a power of two.
 ///
 /// It implements [`Deref`] to [`FoldedEvaluationsSlice`], meaning that all the methods
-/// on [`FoldedEvaluationsSlice`] are available on `FoldedEvaluations` as well.
+/// on [`FoldedEvaluationsSlice`] are available on [`FoldedEvaluations`] as well.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct FoldedEvaluations<const N: usize, F>(Vec<F>);
 
@@ -26,7 +27,7 @@ impl<const N: usize, F> FoldedEvaluations<N, F> {
     /// len of `evaluations`. If `w` is `F::get_root_of_unity(n).unwrap()`, then `evaluations[i]` is the
     /// evaluation at `w^i`.
     ///
-    /// See [https://eprint.iacr.org/2022/1216.pdf].
+    /// > See <https://eprint.iacr.org/2022/1216.pdf>.
     ///
     /// # Panics
     /// This may either panic or have unspecified behaviour if `N` is not a power of two or
@@ -171,7 +172,7 @@ impl<const N: usize, F> FoldedEvaluationsSlice<N, F> {
     #[inline]
     pub const fn from_flat_evaluations_unchecked(evaluations: &[F]) -> &Self {
         // SAFETY: `Self` and `[F]` have the same layout.
-        // See [https://rust-lang.github.io/unsafe-code-guidelines/layout/structs-and-tuples.html#single-field-structs]
+        // See <https://rust-lang.github.io/unsafe-code-guidelines/layout/structs-and-tuples.html#single-field-structs>
         unsafe { &*(evaluations as *const [F] as *const Self) }
     }
     /// Yields the underlying slice. See [`FoldedEvaluations::into_flat_evaluations`].
@@ -233,7 +234,7 @@ impl<'a, const N: usize, F> IntoIterator for &'a FoldedEvaluationsSlice<N, F> {
 /// `F` does not contain subgroups of size `evaluations.len()` and `N`.
 ///
 /// # Credits
-/// This is partly based on equation (4) from [https://eprint.iacr.org/2022/1216.pdf].
+/// This is partly based on equation (4) from <https://eprint.iacr.org/2022/1216.pdf>.
 pub fn reduce_polynomial<const N: usize, F: FftField>(
     evaluations: &FoldedEvaluations<N, F>,
     alpha: F,

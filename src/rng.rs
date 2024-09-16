@@ -1,3 +1,4 @@
+//! Related to random things
 use std::mem::size_of;
 
 use ark_ff::Field;

@@ -1,4 +1,8 @@
-//! Référence : [1] https://mathexp.eu/chyzak/aecf-distrib/pdf/aecf-screen-1.1.pdf (Chapitre 5; pages 98 à 105)
+//! Implements _Lagrange's polynomial interpolation_ as defined in
+//! [Alin Bostan et al. 2018](https://mathexp.eu/chyzak/aecf-distrib/pdf/aecf-screen-1.1.pdf)
+//!
+//! This module focuses on section 5.3 of the book, entitled _Interpolation de Lagrange_, from page
+//! 98 to page 103.
 
 use std::{fmt::Debug, iter::zip, ops::Deref};
 
@@ -9,6 +13,8 @@ use ark_poly::{
 };
 
 /// Stores a complete binary tree in a contiguous memory allocation
+///
+/// > this is the _owned_ version of [`VecBinarySubTree`]
 #[derive(Clone, PartialEq, Eq)]
 struct VecBinaryTree<F>(Vec<F>);
 impl<F> Deref for VecBinaryTree<F> {
@@ -26,6 +32,27 @@ impl<F: Debug> Debug for VecBinaryTree<F> {
 }
 
 #[derive(PartialEq, Eq)]
+/// A binary tree where nodes are stored in a flat structure.
+///
+/// > this is the _sliced_ version of [`VecBinarySubTree`]
+///
+/// # Example
+/// the following binary tree
+/// ```text
+/// 1
+/// |--- 2
+/// |    |--- 4
+/// |    `--- 5
+/// `--- 3
+///      |--- 6
+///      `--- 7
+/// ```
+/// will be stored in a [`VecBinarySubTree`] as follows
+/// ```text
+/// [4, 5, 2, 6, 7, 3, 1]
+///  \_____/  \_____/  |
+///   left     right  root
+/// ```
 struct VecBinarySubTree<F>([F]);
 
 impl<F> VecBinarySubTree<F> {
@@ -61,26 +88,29 @@ impl<F: Debug> Debug for VecBinarySubTree<F> {
     }
 }
 
-/// See [1] "algorithme 5.3" (page 101)
+/// Implements the _Fast sub-product tree_ algorithm
+///
+/// > see algorithm 5.3 on page 101
 #[inline]
 fn subproduct_tree<F: FftField>(x: &[F]) -> VecBinaryTree<DensePolynomial<F>> {
     assert!(
         x.len().is_power_of_two(),
-        "Number of points must be a power of two"
+        "Number of points must be a power of two, found {}",
+        x.len(),
     );
 
     let mut buffer = Vec::with_capacity(2 * x.len() - 1);
-    subproduct_tree_rec(x, &mut buffer);
+    aux(x, &mut buffer);
     return VecBinaryTree(buffer);
 
-    fn subproduct_tree_rec<F: FftField>(x: &[F], tree: &mut Vec<DensePolynomial<F>>) {
+    fn aux<F: FftField>(x: &[F], tree: &mut Vec<DensePolynomial<F>>) {
         if x.len() == 1 {
             tree.push(DensePolynomial::from_coefficients_slice(&[-x[0], F::ONE]));
         } else {
             let offset = tree.len();
             let (x1, x2) = x.split_at(x.len() / 2);
-            subproduct_tree_rec(x1, tree);
-            subproduct_tree_rec(x2, tree);
+            aux(x1, tree);
+            aux(x2, tree);
 
             let len = tree.len();
             let poly1 = &tree[offset + (len - offset) / 2 - 1];
@@ -92,7 +122,9 @@ fn subproduct_tree<F: FftField>(x: &[F]) -> VecBinaryTree<DensePolynomial<F>> {
     }
 }
 
-/// See [1] "algorithme 5.6" (page 103)
+/// Implements the _Fast fraction sum_ algorithm
+///
+/// > see algorithm 5.6 on page 103
 fn fast_fraction_sum<F: FftField>(
     subproducts: &VecBinarySubTree<DensePolynomial<F>>,
     c: &[F],
@@ -114,26 +146,30 @@ fn fast_fraction_sum<F: FftField>(
     }
 }
 
-/// Evaluates `poly` (of degree `d`) on each value of `points` (of size `n`).
-/// `n` must be a power of two strictly greater than `d`.
+/// Evaluates `poly`, which is of degree `d`, on each value of `points`, which is of size `n`.
+///
+/// > /!\ **Warning**
+/// >
+/// > `n` must be a power of two strictly greater than `d`
 ///
 /// This is more efficient than computing the evaluations separately.
 ///
 /// This function is intended to be used when the structure of `points` has no particular property.
 /// If `points` is an FFT domain, consider using [`DensePolynomial::evaluate_over_domain`] instead.
 ///
-/// # Reference:
-/// See [1] "algorithme 5.5" (page 102)
+/// > :bulb: **Reference**
+/// >
+/// > see algorithm 5.5 page 102
 #[inline]
 fn multipoint_evaluation<F: FftField>(
     poly: DensePolynomial<F>,
     subproducts: &VecBinarySubTree<DensePolynomial<F>>,
 ) -> Vec<F> {
     let mut output = Vec::with_capacity((subproducts.0.len() + 1) / 2);
-    multipoint_evaluation_rec(poly, subproducts, &mut output);
+    aux(poly, subproducts, &mut output);
     return output;
 
-    fn multipoint_evaluation_rec<F: FftField>(
+    fn aux<F: FftField>(
         poly: DensePolynomial<F>,
         subproducts: &VecBinarySubTree<DensePolynomial<F>>,
         output: &mut Vec<F>,
@@ -156,8 +192,8 @@ fn multipoint_evaluation<F: FftField>(
                 .unwrap()
                 .1;
 
-            multipoint_evaluation_rec(p0, left_tree, output);
-            multipoint_evaluation_rec(p1, right_tree, output);
+            aux(p0, left_tree, output);
+            aux(p1, right_tree, output);
         }
     }
 }

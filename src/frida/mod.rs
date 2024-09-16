@@ -1,5 +1,5 @@
 //! Implementation of FRIDA scheme above FRI
-//! [https://eprint.iacr.org/2024/248.pdf]
+//! <https://eprint.iacr.org/2024/248.pdf>
 //!
 //! This module is gated by crate feature `frida`.
 
@@ -16,13 +16,6 @@ use crate::{
     utils::{horner_evaluate, HasherExt, MerkleProof},
     FriCommitments, FriProof, VerifyError,
 };
-
-#[deprecated = "feature `frida_pcs` is not tested"]
-#[cfg(feature = "frida_pcs")]
-mod pcs;
-#[allow(deprecated)]
-#[cfg(feature = "frida_pcs")]
-pub use pcs::*;
 
 #[cfg(test)]
 mod tests;

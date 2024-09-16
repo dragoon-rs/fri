@@ -1,3 +1,4 @@
+//! Implementation of the COMMIT phase of the FRI algorithm
 use ark_ff::FftField;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_serialize::CanonicalSerialize;
