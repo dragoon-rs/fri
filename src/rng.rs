@@ -26,10 +26,12 @@ pub trait ReseedableRng {
     /// # Panics
     /// This panics if this object is not able to draw a random value from this field.
     fn draw_alpha<F: Field>(&mut self) -> F {
-        // TODO? retry on error?
         // This has never failed during tests, but this should be tested with other fields.
-        self.next_bytes(|bytes| F::from_random_bytes(bytes))
-            .expect("Failed to draw alpha")
+        loop {
+            if let Some(alpha) = self.next_bytes(|bytes| F::from_random_bytes(bytes)) {
+                return alpha;
+            }
+        }
     }
 
     /// Draws a [`Vec`] of `count` positions, each of them being strictly less than `domain_size`.
