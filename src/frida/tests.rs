@@ -1,4 +1,4 @@
-use fri_test_utils::{
+use dragoonfri_test_utils::{
     do_for_multiple_folding_factors, random_file, Fq, BLOWUP_FACTOR, DOMAIN_SIZE,
     NUMBER_OF_POLYNOMIALS, NUM_QUERIES, POLY_COEFFS_LEN,
 };

@@ -6,7 +6,7 @@
 use ark_ff::{FftField, Field};
 use derive_more::From;
 use derive_where::derive_where;
-use fri_proc_macros::{CanonicalDeserializeAlt, CanonicalSerializeAlt};
+use dragoonfri_proc_macros::{CanonicalDeserializeAlt, CanonicalSerializeAlt};
 use rs_merkle::{Hasher, MerkleTree};
 
 use crate::{

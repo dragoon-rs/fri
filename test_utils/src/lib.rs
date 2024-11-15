@@ -52,12 +52,13 @@ where
 /// ## example
 /// the following macro invocation
 /// ```rust
+/// # use dragoonfri_test_utils::do_for_multiple_folding_factors;
 /// do_for_multiple_folding_factors!(FACTOR = 2, 4, 8, 16 => {
 ///   // some arbitrary code involving the `FACTOR` constant
 /// });
 /// ```
 /// will be expanded to
-/// ```rust
+/// ```compile_fail
 /// const FACTOR: usize = 2;
 /// // the code
 /// const FACTOR: usize = 4;

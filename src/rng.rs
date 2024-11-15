@@ -62,7 +62,7 @@ pub trait ReseedableRng {
 ///
 /// # Example
 /// ```ignore
-/// use fri::{algorithms::Blake3, rng::{FriChallenger, ReseedableRng}};
+/// use dragoonfri::{algorithms::Blake3, rng::{FriChallenger, ReseedableRng}};
 ///
 /// let mut challenger = FriChallenger::<Blake3>::default();
 ///
@@ -112,7 +112,7 @@ impl<H: Hasher> FriChallenger<H> {
     /// # Example
     /// ```rust
     /// use rs_merkle::Hasher;
-    /// use fri::{algorithms::Blake3, rng::{FriChallenger, ReseedableRng}};
+    /// use dragoonfri::{algorithms::Blake3, rng::{FriChallenger, ReseedableRng}};
     ///
     /// let mut challenger1 = FriChallenger::<Blake3>::default();
     ///

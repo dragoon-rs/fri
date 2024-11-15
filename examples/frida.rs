@@ -5,13 +5,13 @@ use rand::{
 };
 use rs_merkle::Hasher;
 
-use fri::{
+use dragoonfri::{
     algorithms::Sha3_512,
     frida::{nth_evaluations, FridaBuilder, FridaCommitment},
     rng::FriChallenger,
     utils::{to_evaluations, HasherExt},
 };
-use fri_test_utils::Fq;
+use dragoonfri_test_utils::Fq;
 
 struct Params {
     nb_coeffs: usize,
@@ -77,7 +77,7 @@ fn main() {
     const M: usize = 3;
 
     run::<4, Fq, Sha3_512>(
-        fri_test_utils::random_file::<Fq>(PARAMS.nb_coeffs, M),
+        dragoonfri_test_utils::random_file::<Fq>(PARAMS.nb_coeffs, M),
         &PARAMS,
     );
 }

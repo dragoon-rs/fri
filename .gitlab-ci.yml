@@ -1,0 +1,33 @@
+image: "rust:latest"
+
+stages:
+  - fmt
+  - test
+
+variables:
+  NUSHELL_ARCH: "x86_64-unknown-linux-musl"
+  NUSHELL_VERSION: "0.95.0"
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /^(draft|no-ci):/
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: ($CI_PIPELINE_SOURCE == "push") && ($CI_COMMIT_BRANCH == "main")
+
+fmt:
+  stage: fmt
+
+  script:
+    - make fmt-check
+
+test:
+  stage: test
+  needs:
+    - fmt
+
+  script:
+    - make check clippy test
+

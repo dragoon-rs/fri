@@ -1,11 +1,11 @@
 use ark_ff::{FftField, UniformRand};
 use rand::thread_rng;
 
-use fri::{
+use dragoonfri::{
     algorithms::Sha3_512, build_proof, commit_polynomial, rng::FriChallenger,
     utils::to_evaluations, FriProof,
 };
-use fri_test_utils::Fq;
+use dragoonfri_test_utils::Fq;
 
 use rs_merkle::Hasher;
 

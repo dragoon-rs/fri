@@ -4,7 +4,7 @@
 //! This module focuses on section 5.3 of the book, entitled _Interpolation de Lagrange_, from page
 //! 98 to page 103.
 
-use std::{fmt::Debug, iter::zip, ops::Deref};
+use std::{fmt::Debug, ops::Deref};
 
 use ark_ff::FftField;
 use ark_poly::{
@@ -125,6 +125,7 @@ fn subproduct_tree<F: FftField>(x: &[F]) -> VecBinaryTree<DensePolynomial<F>> {
 /// Implements the _Fast fraction sum_ algorithm
 ///
 /// > see algorithm 5.6 on page 103
+#[allow(dead_code)]
 fn fast_fraction_sum<F: FftField>(
     subproducts: &VecBinarySubTree<DensePolynomial<F>>,
     c: &[F],
@@ -155,11 +156,12 @@ fn multiple_fast_fraction_sum<F: FftField>(
     fn aux<F: FftField>(
         subproducts: &VecBinarySubTree<DensePolynomial<F>>,
         all_c: &[Vec<F>],
-        indices: (usize, usize)
+        indices: (usize, usize),
     ) -> Vec<DensePolynomial<F>> {
         if indices.1 == indices.0 {
             let mut output = Vec::with_capacity(all_c.len());
-            all_c.iter()
+            all_c
+                .iter()
                 .map(|c| DensePolynomial::from_coefficients_slice(&[c[indices.0]]))
                 .for_each(|p| output.push(p));
             output
@@ -167,10 +169,10 @@ fn multiple_fast_fraction_sum<F: FftField>(
             let left_tree = subproducts.left_child().unwrap();
             let right_tree = subproducts.right_child().unwrap();
 
-            let indices_left = (indices.0, indices.0 + (indices.1 - indices.0+1) / 2 - 1);
+            let indices_left = (indices.0, indices.0 + (indices.1 - indices.0 + 1) / 2 - 1);
             let indices_right = (indices_left.1 + 1, indices.1);
 
-            let vec_n1 = aux(left_tree, all_c, indices_left );
+            let vec_n1 = aux(left_tree, all_c, indices_left);
             let vec_n2 = aux(right_tree, all_c, indices_right);
 
             let p1 = left_tree.root();
@@ -181,7 +183,6 @@ fn multiple_fast_fraction_sum<F: FftField>(
                 output.push(&vec_n1[i] * p2 + &vec_n2[i] * p1);
             }
             output
-
         }
     }
 }
@@ -288,8 +289,7 @@ pub fn interpolate_polynomials<F: FftField>(shards: &[Vec<F>], positions: &[F]) 
         .collect::<Vec<_>>();
 
     let r = multiple_fast_fraction_sum(&subproducts, all_c.as_slice());
-    r.iter()
-        .for_each(|v| polynomials.push(v.coeffs.clone()));
+    r.iter().for_each(|v| polynomials.push(v.coeffs.clone()));
     polynomials
 }
 
@@ -303,7 +303,7 @@ mod tests {
     };
     use ark_ff::{FftField, Field, Fp64, MontBackend, MontConfig};
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
-    use fri_test_utils::{random_file, Fq};
+    use dragoonfri_test_utils::{random_file, Fq};
     use rand::{thread_rng, Rng};
 
     use super::interpolate_polynomials;
@@ -410,7 +410,7 @@ mod tests {
         while positions.len() < NUM_COEFFS {
             let p = rng.gen_range(0..DOMAIN_SIZE);
             if !positions_set.contains(&p) {
-                positions.push(root.pow(&[p as u64]));
+                positions.push(root.pow([p as u64]));
                 positions_set.insert(p);
 
                 for (evaluation, shard) in zip(&evaluations, &mut shards) {

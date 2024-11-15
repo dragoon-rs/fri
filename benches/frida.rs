@@ -4,14 +4,14 @@ use ark_ff::PrimeField;
 
 use ark_serialize::CanonicalSerialize;
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
-use fri::{
+use dragoonfri::{
     algorithms::Blake3,
     dynamic_folding_factor,
     frida::{nth_evaluations, FridaBuilder, FridaCommitment},
     rng::FriChallenger,
     utils::{to_evaluations, HasherExt},
 };
-use fri_test_utils::{
+use dragoonfri_test_utils::{
     random_file, Fq, BLOWUP_FACTOR, NUMBER_OF_POLYNOMIALS, NUM_QUERIES, POLY_COEFFS_LEN,
 };
 use rand::{thread_rng, Rng};
@@ -98,7 +98,7 @@ impl<'a> FridaParametricBencher<'a> {
         let mut proof_sizes =
             csv::Writer::from_path(format!("target/proof_sizes/proof_size_{id}.csv")).unwrap();
         proof_sizes
-            .write_record(&["input", "commit_size", "proof_size"])
+            .write_record(["input", "commit_size", "proof_size"])
             .unwrap();
 
         for &(folding_factor, file_size, k, m) in &self.parameters {
@@ -107,7 +107,7 @@ impl<'a> FridaParametricBencher<'a> {
                 b.iter_batched(
                     || random_evaluations(k, m),
                     |file_evals| {
-                        let builder: _ = frida_builder(folding_factor, &file_evals, bf, q);
+                        let builder = frida_builder(folding_factor, &file_evals, bf, q);
 
                         for i in 0..(k * bf) {
                             black_box(builder.prove_shards(&[i]));
@@ -117,7 +117,7 @@ impl<'a> FridaParametricBencher<'a> {
                 );
             });
 
-            let builder: _ = frida_builder(folding_factor, &random_evaluations(k, m), bf, q);
+            let builder = frida_builder(folding_factor, &random_evaluations(k, m), bf, q);
 
             let mut proof_size = 0;
             for i in 0..(k * bf) {
@@ -182,7 +182,7 @@ impl<'a> FridaParametricBencher<'a> {
                     b.iter_batched(
                         || {
                             let evals = random_evaluations(k, m);
-                            let builder: _ = frida_builder(folding_factor, &evals, bf, q);
+                            let builder = frida_builder(folding_factor, &evals, bf, q);
                             let pos = thread_rng().gen_range(0..(k * bf));
                             let proof = builder.prove_shards(&[pos]);
                             (

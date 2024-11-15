@@ -1,11 +1,11 @@
 use ark_ff::FftField;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-use fri::{
+use dragoonfri::{
     algorithms::{Blake3, Sha3_256, Sha3_512},
     build_proof, commit_polynomial,
-    rng::{FriChallenger, ReseedableRng},
+    rng::FriChallenger,
 };
-use fri_test_utils::{do_for_multiple_folding_factors, Fq};
+use dragoonfri_test_utils::{do_for_multiple_folding_factors, Fq};
 use rand::thread_rng;
 use rs_merkle::Hasher;
 
@@ -33,10 +33,8 @@ impl std::fmt::Display for Params {
     }
 }
 
-fn bench_commit_template<const N: usize, F: FftField, H: Hasher, R: ReseedableRng<Seed = H::Hash>>(
-    c: &mut Criterion,
-    params: &Params,
-) where
+fn bench_commit_template<const N: usize, F: FftField, H: Hasher>(c: &mut Criterion, params: &Params)
+where
     <H as rs_merkle::Hasher>::Hash: AsRef<[u8]>,
 {
     c.bench_function(
@@ -62,10 +60,8 @@ fn bench_commit_template<const N: usize, F: FftField, H: Hasher, R: ReseedableRn
     );
 }
 
-fn bench_query_template<const N: usize, F: FftField, H: Hasher, R: ReseedableRng<Seed = H::Hash>>(
-    c: &mut Criterion,
-    params: &Params,
-) where
+fn bench_query_template<const N: usize, F: FftField, H: Hasher>(c: &mut Criterion, params: &Params)
+where
     <H as rs_merkle::Hasher>::Hash: AsRef<[u8]>,
 {
     c.bench_function(
@@ -93,10 +89,8 @@ fn bench_query_template<const N: usize, F: FftField, H: Hasher, R: ReseedableRng
     );
 }
 
-fn bench_verify_template<const N: usize, F: FftField, H: Hasher, R: ReseedableRng<Seed = H::Hash>>(
-    c: &mut Criterion,
-    params: &Params,
-) where
+fn bench_verify_template<const N: usize, F: FftField, H: Hasher>(c: &mut Criterion, params: &Params)
+where
     <H as rs_merkle::Hasher>::Hash: AsRef<[u8]>,
 {
     c.bench_function(
@@ -132,7 +126,7 @@ fn bench_verify_template<const N: usize, F: FftField, H: Hasher, R: ReseedableRn
     );
 }
 
-fn bench_fri<F: FftField, H: Hasher, R: ReseedableRng<Seed = H::Hash>>(c: &mut Criterion)
+fn bench_fri<F: FftField, H: Hasher>(c: &mut Criterion)
 where
     <H as rs_merkle::Hasher>::Hash: AsRef<[u8]>,
 {
@@ -146,17 +140,17 @@ where
                 nb_queries: q,
                 domain_size: d,
             };
-            bench_commit_template::<N, F, H, R>(c, &params);
-            bench_query_template::<N, F, H, R>(c, &params);
-            bench_verify_template::<N, F, H, R>(c, &params);
+            bench_commit_template::<N, F, H>(c, &params);
+            bench_query_template::<N, F, H>(c, &params);
+            bench_verify_template::<N, F, H>(c, &params);
         })
     }
 }
 
 criterion_group!(
     benches,
-    bench_fri::<Fq, Blake3, FriChallenger<Blake3>>,
-    bench_fri::<Fq, Sha3_256, FriChallenger<Sha3_256>>,
-    bench_fri::<Fq, Sha3_512, FriChallenger<Sha3_512>>,
+    bench_fri::<Fq, Blake3>,
+    bench_fri::<Fq, Sha3_256>,
+    bench_fri::<Fq, Sha3_512>,
 );
 criterion_main!(benches);

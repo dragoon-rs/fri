@@ -14,5 +14,14 @@ fmt:
 fmt-check:
 	cargo fmt --all -- --check
 
+.PHONY: check
+check:
+	cargo check --workspace --all-targets
+	cargo check --workspace --all-targets --all-features
+
+.PHONY: clippy
+clippy:
+	cargo clippy --workspace --all-targets --all-features -- -D warnings
+
 test:
-	cargo test -- --nocapture
+	cargo test --workspace -- --nocapture

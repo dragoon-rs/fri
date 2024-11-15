@@ -281,7 +281,7 @@ pub fn reduce_polynomial<const N: usize, F: FftField>(
 ///
 /// # Example
 /// ```rust
-/// use fri::folding::fold_positions;
+/// use dragoonfri::folding::fold_positions;
 ///
 /// // Domain (1, w, ..., w^7), where w^8 = 1
 /// let positions = vec![7, 2, 4, 4, 1, 3];

@@ -1,7 +1,16 @@
 [package]
-name = "fri_proc_macros"
+name = "dragoonfri-proc-macros"
 version = "0.1.0"
 edition = "2021"
+description = "Fast Reed-solomon Interactive oracle proof of proximity - Proc macros"
+repository = "https://gitlab.isae-supaero.fr/dragoon/fri"
+readme = "../README.md"
+license = "MIT"
+authors = [
+    "Antonin Bretagne <antonin.bretagne@student.isae-supaero.fr>", # author
+    "Antoine Stevan <antoine.stevan@isae-supaero.fr>",             # maintainer
+    "Jonathan Detchart <jonathan.detchart@isae-supaero.fr>",       # maintainer
+]
 
 [lib]
 proc_macro = true
@@ -9,6 +18,6 @@ proc_macro = true
 [dependencies]
 proc-macro2 = "1.0.86"
 quote = "1.0.36"
-syn = "2.0.68"
+syn = { version = "2.0.68", features = [ "full" ] }
 # documentation deps
 ark-serialize = { workspace = true }

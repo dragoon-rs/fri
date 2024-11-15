@@ -186,8 +186,8 @@ impl<H: Hasher> MerkleTreeExt for MerkleTree<H> {
 /// # use ark_poly::{Polynomial, DenseUVPolynomial, univariate::DensePolynomial};
 /// # use rand::{thread_rng, Rng};
 /// #
-/// # use fri::utils::{to_evaluations, to_polynomial};
-/// # use fri_test_utils::Fq;
+/// # use dragoonfri::utils::{to_evaluations, to_polynomial};
+/// # use dragoonfri_test_utils::Fq;
 /// #
 /// const POLY_COEFFS_LEN: usize = 32;
 /// const DOMAIN_SIZE: usize = 128;

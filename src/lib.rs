@@ -8,8 +8,8 @@ use ark_poly::{
 
 pub use commit::FriCommitments;
 use derive_where::derive_where;
+use dragoonfri_proc_macros::{CanonicalDeserializeAlt, CanonicalSerializeAlt};
 use folding::{fold_positions, FoldedEvaluationsSlice};
-use fri_proc_macros::{CanonicalDeserializeAlt, CanonicalSerializeAlt};
 use rng::ReseedableRng;
 use rs_merkle::Hasher;
 use utils::{horner_evaluate, to_evaluations, AssertPowerOfTwo, HasherExt, MerkleProof};

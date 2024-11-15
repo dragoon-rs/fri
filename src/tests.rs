@@ -1,5 +1,5 @@
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use fri_test_utils::{
+use dragoonfri_test_utils::{
     do_for_multiple_folding_factors, Fq, BLOWUP_FACTOR, DOMAIN_SIZE, NUMBER_OF_POLYNOMIALS,
     NUM_QUERIES, POLY_COEFFS_LEN,
 };
