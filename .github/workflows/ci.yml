@@ -1,0 +1,35 @@
+name: Rust CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'draft:') && !contains(github.event.head_commit.message, 'no-ci:')"
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Run fmt check
+        run: make fmt-check
+
+  test:
+    runs-on: ubuntu-latest
+    needs: fmt
+    if: "!contains(github.event.head_commit.message, 'draft:') && !contains(github.event.head_commit.message, 'no-ci:')"
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Run tests
+        run: |
+          make check clippy test example
