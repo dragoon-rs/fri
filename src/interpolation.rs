@@ -146,11 +146,48 @@ fn fast_fraction_sum<F: FftField>(
     }
 }
 
-/// Evaluates `poly`, which is of degree `d`, on each value of `points`, which is of size `n`.
-///
-/// > /!\ **Warning**
-/// >
-/// > `n` must be a power of two strictly greater than `d`
+fn multiple_fast_fraction_sum<F: FftField>(
+    subproducts: &VecBinarySubTree<DensePolynomial<F>>,
+    all_c: &[Vec<F>],
+) -> Vec<DensePolynomial<F>> {
+    return aux(subproducts, all_c, (0, all_c[0].len() - 1));
+
+    fn aux<F: FftField>(
+        subproducts: &VecBinarySubTree<DensePolynomial<F>>,
+        all_c: &[Vec<F>],
+        indices: (usize, usize)
+    ) -> Vec<DensePolynomial<F>> {
+        if indices.1 == indices.0 {
+            let mut output = Vec::with_capacity(all_c.len());
+            all_c.iter()
+                .map(|c| DensePolynomial::from_coefficients_slice(&[c[indices.0]]))
+                .for_each(|p| output.push(p));
+            output
+        } else {
+            let left_tree = subproducts.left_child().unwrap();
+            let right_tree = subproducts.right_child().unwrap();
+
+            let indices_left = (indices.0, indices.0 + (indices.1 - indices.0+1) / 2 - 1);
+            let indices_right = (indices_left.1 + 1, indices.1);
+
+            let vec_n1 = aux(left_tree, all_c, indices_left );
+            let vec_n2 = aux(right_tree, all_c, indices_right);
+
+            let p1 = left_tree.root();
+            let p2 = right_tree.root();
+
+            let mut output = Vec::with_capacity(all_c.len());
+            for i in 0..all_c.len() {
+                output.push(&vec_n1[i] * p2 + &vec_n2[i] * p1);
+            }
+            output
+
+        }
+    }
+}
+
+/// Evaluates `poly` (of degree `d`) on each value of `points` (of size `n`).
+/// `n` must be a power of two strictly greater than `d`.
 ///
 /// This is more efficient than computing the evaluations separately.
 ///
@@ -239,15 +276,20 @@ pub fn interpolate_polynomials<F: FftField>(shards: &[Vec<F>], positions: &[F]) 
 
     let mut polynomials = Vec::with_capacity(shards.len());
 
-    for shard in shards {
-        let c = zip(shard, &d_inv)
-            .map(|(&bi, &di)| bi * di)
-            .collect::<Vec<_>>();
+    let all_c: Vec<Vec<F>> = shards
+        .iter()
+        .map(|shard| {
+            shard
+                .iter()
+                .zip(d_inv.iter())
+                .map(|(&x, &y)| x * y)
+                .collect()
+        })
+        .collect::<Vec<_>>();
 
-        let r = fast_fraction_sum(&subproducts, &c);
-        polynomials.push(r.coeffs);
-    }
-
+    let r = multiple_fast_fraction_sum(&subproducts, all_c.as_slice());
+    r.iter()
+        .for_each(|v| polynomials.push(v.coeffs.clone()));
     polynomials
 }
 
