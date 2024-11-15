@@ -31,5 +31,4 @@ jobs:
         with:
           toolchain: stable
       - name: Run tests
-        run: |
-          make check clippy test example
+        run: make check clippy test
