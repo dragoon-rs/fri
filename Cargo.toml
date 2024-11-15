@@ -1,7 +1,16 @@
 [package]
-name = "fri"
+name = "dragoonfri"
 version = "0.1.0"
 edition = "2021"
+description = "Fast Reed-solomon Interactive oracle proof of proximity"
+repository = "https://gitlab.isae-supaero.fr/dragoon/fri"
+readme = "README.md"
+license = "MIT"
+authors = [
+    "Antonin Bretagne <antonin.bretagne@student.isae-supaero.fr>", # author
+    "Antoine Stevan <antoine.stevan@isae-supaero.fr>",             # maintainer
+    "Jonathan Detchart <jonathan.detchart@isae-supaero.fr>",       # maintainer
+]
 
 [workspace]
 members = [ "proc_macro", "test_utils" ]
@@ -43,7 +52,7 @@ default = ["sha3", "blake3", "frida", "interpolation"]
 
 [[bench]]
 name = "fri"
-harness = false 
+harness = false
 required-features = ["blake3"]
 
 [[bench]]
